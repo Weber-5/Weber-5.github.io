@@ -233,7 +233,7 @@ p { text-wrap: pretty; }
   border-color: var(--ink-3);
   box-shadow: var(--shadow-2);
 }
-.btn:active { transform: translateY(0); }
+.btn:active { transform: translateY(0) scale(0.97); }
 .btn-primary {
   border-color: var(--ink);
   background: var(--ink);
@@ -441,7 +441,7 @@ html.theme-switching *::after { transition: none !important; }
     scroll-behavior: auto !important;
   }
   .js [data-reveal] { opacity: 1; transform: none; }
-  .ls-signal, .ls-mist { display: none; }
+  .ls-signal, .ls-mist, .ink-drop { display: none; }
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }

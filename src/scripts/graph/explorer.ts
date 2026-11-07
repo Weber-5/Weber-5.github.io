@@ -14,6 +14,8 @@ export async function initExplorer(root: HTMLElement) {
   const dock = $(root, '[data-dock]');
   const live = $(root, '[data-live]');
   const traceCard = $(root, '[data-trace-card]');
+  const detailBody = $(root, '[data-d-body]');
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const data: GraphData = await (await fetch('/graph.json')).json();
 
   const wide = () => innerWidth > 900;
@@ -53,6 +55,7 @@ export async function initExplorer(root: HTMLElement) {
   /* --- Detail panel ---------------------------------------------------------- */
 
   function renderDetail(node: SimNode | null) {
+    const switching = detail.classList.contains('is-open') && !!node;
     detail.classList.toggle('is-open', !!node);
     detail.setAttribute('aria-hidden', String(!node));
     history.replaceState(null, '', node ? `#node=${encodeURIComponent(node.id)}` : location.pathname);
@@ -93,6 +96,14 @@ export async function initExplorer(root: HTMLElement) {
       }),
     );
     live.textContent = nameOf(node.title);
+
+    // Moving between nodes, the new content settles in rather than swapping hard.
+    if (switching && !still) {
+      detailBody.animate([{ opacity: 0.25, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], {
+        duration: 280,
+        easing: 'cubic-bezier(0.22, 0.8, 0.24, 1)',
+      });
+    }
   }
 
   $(detail, '[data-d-close]').addEventListener('click', () => graph.select(null, false));

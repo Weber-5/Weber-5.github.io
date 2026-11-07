@@ -38,7 +38,12 @@ const mismatch = bodyLang !== lang && note.words > 30;
 ---
 
 <Base lang={lang} title={title} description={noteSummary(note, lang)} type="article">
-  <div class="note" data-note-page data-lang={lang}>
+  <div
+    class="note"
+    data-note-page
+    data-lang={lang}
+    data-strings={JSON.stringify({ linkCopied: t('toast.link'), footnote: t('notes.footnote'), close: t('lightbox.close') })}
+  >
     <div class="progress" aria-hidden="true"><span data-progress></span></div>
 
     <div class="wrap layout">

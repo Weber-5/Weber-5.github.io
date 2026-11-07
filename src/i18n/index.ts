@@ -42,6 +42,11 @@ const en = {
   'a11y.search': 'Search the site',
   'a11y.lang': '中文',
   'a11y.langLabel': 'Switch language to Chinese',
+  'a11y.top': 'Back to top',
+  'toast.link': 'Link to this section copied',
+  'notes.footnote': 'Footnote',
+  'graph.loading': 'Drawing the map…',
+  'lightbox.close': 'Close figure',
 
   'home.title': 'Personal Academic Website',
   'home.eyebrow': 'Academic Archive',
@@ -206,6 +211,11 @@ const zh: Record<UiKey, string> = {
   'a11y.search': '搜索全站',
   'a11y.lang': 'EN',
   'a11y.langLabel': 'Switch language to English',
+  'a11y.top': '回到顶部',
+  'toast.link': '已复制本节链接',
+  'notes.footnote': '脚注',
+  'graph.loading': '正在绘制图谱…',
+  'lightbox.close': '关闭图片',
 
   'home.title': '个人学术主页',
   'home.eyebrow': '学术档案',

@@ -43,7 +43,10 @@ const { index, title, id, link } = Astro.props;
     min-width: 20px;
     align-self: center;
     background: var(--line);
+    transform-origin: left;
+    transition: transform 1.1s var(--ease) 0.15s;
   }
+  :global(.js) .head:not(:global(.is-in)) .rule { transform: scaleX(0); }
   .text-link { flex: none; }
   @media (max-width: 560px) {
     .head { flex-wrap: wrap; }

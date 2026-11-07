@@ -228,6 +228,38 @@ details.callout > summary::marker { color: var(--ink-3); }
 }
 .prose .footnotes h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 
+/* Figures open full size */
+.prose img.is-zoomable { cursor: zoom-in; transition: box-shadow var(--t-med) var(--ease); }
+.prose img.is-zoomable:hover { box-shadow: var(--shadow-2); }
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 5vmin;
+  border: 0;
+  background: transparent;
+  cursor: zoom-out;
+}
+.lightbox[open] { display: grid; place-items: center; }
+.lightbox::backdrop {
+  background: light-dark(rgb(246 247 248 / 0.92), rgb(12 14 17 / 0.92));
+  backdrop-filter: blur(4px);
+}
+.lightbox img {
+  max-width: min(1200px, 100%);
+  max-height: 100%;
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-3);
+  object-fit: contain;
+  transform-origin: 0 0;
+}
+
 /* Wikilink hover preview */
 .note-preview {
   position: fixed;

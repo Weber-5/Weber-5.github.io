@@ -83,7 +83,7 @@ const jsonLd = {
                 {t(link.key)}
               </a>
             ) : (
-              <span class="btn" aria-disabled="true" title={t('link.pending')}>
+              <span class="btn" aria-disabled="true" data-tip={t('link.pending')}>
                 <Icon name={link.icon} />
                 {t(link.key)}
               </span>
@@ -97,6 +97,10 @@ const jsonLd = {
         caption={`${t('home.fig')} · ${t('home.portrait')}`}
         coordinates={profile.coordinates}
       />
+    </div>
+    <div class="cue wrap" aria-hidden="true">
+      <span class="cue-line"><span class="cue-dot"></span></span>
+      <span class="label">{t('home.scroll')}</span>
     </div>
   </section>
 
@@ -153,9 +157,9 @@ const jsonLd = {
         <h2 id="graph-preview-title" data-reveal>{t('home.graph')}</h2>
         <p class="lead" data-reveal>{t('home.graph.lead')}</p>
         <dl class="stats" data-reveal>
-          <div><dt>{t('graph.stat.notes')}</dt><dd>{stats.notes}</dd></div>
-          <div><dt>{t('graph.stat.links')}</dt><dd>{stats.links}</dd></div>
-          <div><dt>{t('graph.stat.fields')}</dt><dd>{stats.fields}</dd></div>
+          <div><dt>{t('graph.stat.notes')}</dt><dd data-count={stats.notes} style={`--d:${String(stats.notes).length}`}>{stats.notes}</dd></div>
+          <div><dt>{t('graph.stat.links')}</dt><dd data-count={stats.links} style={`--d:${String(stats.links).length}`}>{stats.links}</dd></div>
+          <div><dt>{t('graph.stat.fields')}</dt><dd data-count={stats.fields} style={`--d:${String(stats.fields).length}`}>{stats.fields}</dd></div>
         </dl>
         <ul class="domains" data-reveal>
           {taxonomy.map((d) => (
@@ -278,6 +282,43 @@ const jsonLd = {
   .intro { margin-top: 12px; max-width: 54ch; color: var(--ink-2); }
   .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
 
+  /* A scroll cue: a single drop running down a hairline, a few times, then rest. */
+  .cue {
+    position: absolute;
+    right: 0;
+    bottom: 26px;
+    left: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: cue-in 1s var(--ease) 1.4s both;
+  }
+  .cue .label { font-size: 0.625rem; }
+  .cue-line {
+    position: relative;
+    width: 1px;
+    height: 34px;
+    overflow: hidden;
+    background: var(--line-2);
+  }
+  .cue-dot {
+    position: absolute;
+    top: 0;
+    left: -1px;
+    width: 3px;
+    height: 10px;
+    border-radius: 2px;
+    background: var(--blue);
+    animation: cue-run 2.4s var(--ease-in-out) 2s 6 both;
+  }
+  @keyframes cue-in { from { opacity: 0; } }
+  @keyframes cue-run {
+    0% { transform: translateY(-12px); opacity: 0; }
+    30% { opacity: 1; }
+    100% { transform: translateY(36px); opacity: 0; }
+  }
+
   /* --- Dossier --- */
   .dossier {
     display: grid;
@@ -384,6 +425,7 @@ const jsonLd = {
   @media (max-width: 820px) {
     .hero { min-height: 0; padding-top: calc(var(--nav-h) + 56px); }
     .hero-grid { grid-template-columns: 1fr; }
+    .cue { display: none; }
     .dossier { grid-template-columns: 1fr; }
     .philosophy { position: static; }
     .landscape { height: 54%; }

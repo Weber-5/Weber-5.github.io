@@ -45,6 +45,10 @@ const listed = (domain: string, field?: string) =>
   <div class="explorer" data-explorer data-lang={lang} data-strings={JSON.stringify(strings)}>
     <canvas class="map" tabindex="0" aria-label={t('graph.canvas')}></canvas>
     <p class="sr-only" aria-live="polite" data-live></p>
+    <div class="loading" aria-hidden="true">
+      <span class="drop"></span>
+      <span class="label">{t('graph.loading')}</span>
+    </div>
 
     <section class="panel" data-panel aria-label={t('graph.title')}>
       <details class="panel-fold" open>
@@ -55,9 +59,9 @@ const listed = (domain: string, field?: string) =>
         <div class="panel-body">
           <p class="lead">{t('graph.lead')}</p>
           <dl class="stats">
-            <div><dt>{t('graph.stat.notes')}</dt><dd>{stats.notes}</dd></div>
-            <div><dt>{t('graph.stat.links')}</dt><dd>{stats.links}</dd></div>
-            <div><dt>{t('graph.stat.fields')}</dt><dd>{stats.fields}</dd></div>
+            <div><dt>{t('graph.stat.notes')}</dt><dd data-count={stats.notes} style={`--d:${String(stats.notes).length}`}>{stats.notes}</dd></div>
+            <div><dt>{t('graph.stat.links')}</dt><dd data-count={stats.links} style={`--d:${String(stats.links).length}`}>{stats.links}</dd></div>
+            <div><dt>{t('graph.stat.fields')}</dt><dd data-count={stats.fields} style={`--d:${String(stats.fields).length}`}>{stats.fields}</dd></div>
           </dl>
 
           <div class="search">
@@ -105,6 +109,7 @@ const listed = (domain: string, field?: string) =>
       <button type="button" class="close" data-d-close aria-label={t('graph.close')}>
         <Icon name="close" />
       </button>
+      <div data-d-body>
       <p class="label" data-d-kind></p>
       <h2 data-d-title></h2>
       <p class="crumb" data-d-crumb></p>
@@ -115,6 +120,7 @@ const listed = (domain: string, field?: string) =>
       </a>
       <p class="label neighbors-label">{t('graph.neighbors')} · <span data-d-count></span></p>
       <ul class="neighbors" data-d-neighbors></ul>
+      </div>
     </aside>
 
     <div class="trace-card" data-trace-card hidden>
@@ -128,27 +134,27 @@ const listed = (domain: string, field?: string) =>
     </div>
 
     <div class="dock" data-dock role="toolbar" aria-label={t('graph.title')}>
-      <button type="button" class="tool" data-trace aria-pressed="false" title={t('graph.trace')}>
+      <button type="button" class="tool" data-trace aria-pressed="false" data-tip={t('graph.trace')} data-tip-pos="top">
         <Icon name="route" />
         <span>{t('graph.trace')}</span>
       </button>
-      <button type="button" class="tool" data-wander aria-pressed="false" title={t('graph.wander')}>
+      <button type="button" class="tool" data-wander aria-pressed="false" data-tip={t('graph.wander')} data-tip-pos="top">
         <Icon name="compass" />
         <span>{t('graph.wander')}</span>
       </button>
       <span class="sep" aria-hidden="true"></span>
       <div class="grow">
-        <button type="button" class="tool" data-grow aria-pressed="false" title={t('graph.grow')} aria-label={t('graph.grow')}>
+        <button type="button" class="tool" data-grow aria-pressed="false" aria-label={t('graph.grow')} data-tip={t('graph.grow')} data-tip-pos="top">
           <Icon name="play" />
         </button>
         <input type="range" min="0" max="1000" value="1000" data-grow-range aria-label={t('graph.grow')} />
         <output class="label" data-grow-date></output>
       </div>
       <span class="sep" aria-hidden="true"></span>
-      <button type="button" class="tool icon" data-zoom-out aria-label={t('graph.zoomOut')}><Icon name="minus" /></button>
-      <button type="button" class="tool icon" data-zoom-in aria-label={t('graph.zoomIn')}><Icon name="plus" /></button>
-      <button type="button" class="tool icon" data-fit aria-label={t('graph.fit')}><Icon name="fit" /></button>
-      <button type="button" class="tool icon" data-list-toggle aria-pressed="false" aria-label={t('graph.list')} title={t('graph.list')}><Icon name="list" /></button>
+      <button type="button" class="tool icon" data-zoom-out aria-label={t('graph.zoomOut')} data-tip={t('graph.zoomOut')} data-tip-pos="top"><Icon name="minus" /></button>
+      <button type="button" class="tool icon" data-zoom-in aria-label={t('graph.zoomIn')} data-tip={t('graph.zoomIn')} data-tip-pos="top"><Icon name="plus" /></button>
+      <button type="button" class="tool icon" data-fit aria-label={t('graph.fit')} data-tip={t('graph.fit')} data-tip-pos="top"><Icon name="fit" /></button>
+      <button type="button" class="tool icon" data-list-toggle aria-pressed="false" aria-label={t('graph.list')} data-tip={t('graph.list')} data-tip-pos="top"><Icon name="list" /></button>
     </div>
 
     <p class="hint label">{t('graph.hint')}</p>
@@ -437,7 +443,12 @@ const listed = (domain: string, field?: string) =>
     font-weight: 500;
     color: var(--ink-2);
     white-space: nowrap;
-    transition: background-color var(--t-fast), color var(--t-fast);
+    transition: background-color var(--t-fast), color var(--t-fast), transform var(--t-fast) var(--ease);
+  }
+  .tool:active { transform: scale(0.92); }
+  /* Labelled tools need no tooltip while their label is on screen. */
+  @media (min-width: 1081px) {
+    .tool:not(.icon)[data-tip]::after { display: none; }
   }
   .tool.icon { width: 34px; padding: 0; justify-content: center; }
   .tool:hover { background: var(--blue-wash); color: var(--ink); }
@@ -523,6 +534,39 @@ const listed = (domain: string, field?: string) =>
   .list-fields h3 { margin-bottom: 6px; font-size: 0.6875rem; letter-spacing: 0.08em; }
   .list-fields a { font-size: var(--fs-sm); color: var(--ink-2); }
   .list-fields a:hover { color: var(--blue); }
+
+  /* While the engine and data load: one drop of ink, breathing. */
+  .loading {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 16px;
+    pointer-events: none;
+    transition: opacity 600ms var(--ease), visibility 600ms;
+  }
+  .explorer:global(.is-ready) .loading { opacity: 0; visibility: hidden; }
+  .explorer:global(.is-ready) .drop,
+  .explorer:global(.is-ready) .drop::after { animation: none; }
+  .drop {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ink);
+    animation: drop-breathe 1.6s var(--ease-in-out) infinite;
+  }
+  .drop::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 1px solid var(--blue);
+    border-radius: 50%;
+    animation: drop-ring 1.6s var(--ease) infinite;
+  }
+  @keyframes drop-breathe { 50% { transform: scale(0.72); opacity: 0.6; } }
+  @keyframes drop-ring { from { transform: scale(1); opacity: 0.8; } to { transform: scale(3.2); opacity: 0; } }
 
   @media (max-width: 1080px) {
     .tool span { display: none; }

@@ -36,6 +36,7 @@ const isActive = (p: string) => path.startsWith(p);
 
     <nav class="links" aria-label={t('nav.primary')}>
       <ul>
+        <span class="hover-pill" data-hover-pill aria-hidden="true"></span>
         {items.map((item) => (
           <li>
             <a href={href(item.path, lang)} aria-current={isActive(item.path) ? 'page' : undefined}>
@@ -48,7 +49,7 @@ const isActive = (p: string) => path.startsWith(p);
     </nav>
 
     <div class="tools">
-      <button class="tool search" type="button" data-palette-open aria-label={t('a11y.search')}>
+      <button class="tool search" type="button" data-palette-open aria-label={t('a11y.search')} data-tip={t('a11y.search')}>
         <Icon name="search" />
         <kbd>/</kbd>
       </button>
@@ -58,11 +59,13 @@ const isActive = (p: string) => path.startsWith(p);
         hreflang={other === 'zh' ? 'zh-CN' : 'en'}
         data-lang-switch={other}
         lang={other === 'zh' ? 'zh-CN' : 'en'}
-        title={t('a11y.langLabel')}
+        data-tip={t('a11y.langLabel')}
       >{t('a11y.lang')}</a>
-      <button class="tool" type="button" data-theme-toggle aria-label={t('a11y.theme')}>
-        <Icon name="sun" class="i-sun" />
-        <Icon name="moon" class="i-moon" />
+      <button class="tool" type="button" data-theme-toggle aria-label={t('a11y.theme')} data-tip={t('a11y.theme')}>
+        <span class="swap" aria-hidden="true">
+          <Icon name="sun" class="i-sun" />
+          <Icon name="moon" class="i-moon" />
+        </span>
       </button>
       <button class="tool burger" type="button" data-menu-toggle aria-expanded="false" aria-controls="nav-sheet" aria-label={t('nav.menu')}>
         <Icon name="menu" class="i-open" />
@@ -73,7 +76,7 @@ const isActive = (p: string) => path.startsWith(p);
 
   <div class="sheet" id="nav-sheet">
     <ul>
-      <li><a href={href('/', lang)}>{t('nav.home')}</a></li>
+      <li style="--i:0"><a href={href('/', lang)}>{t('nav.home')}</a></li>
       {items.map((item, i) => (
         <li style={`--i:${i + 1}`}>
           <a href={href(item.path, lang)} aria-current={isActive(item.path) ? 'page' : undefined}>{item.label}</a>
@@ -95,6 +98,7 @@ const isActive = (p: string) => path.startsWith(p);
     border-radius: 18px;
     view-transition-name: site-nav;
     transition:
+      transform var(--t-med) var(--ease),
       width var(--t-med) var(--ease),
       top var(--t-med) var(--ease),
       background-color var(--t-med) var(--ease),
@@ -122,6 +126,8 @@ const isActive = (p: string) => path.startsWith(p);
   }
   .nav:global(.is-scrolled)::before,
   .nav:global(.is-open)::before { opacity: 1; }
+  /* Reading down, the bar steps aside; any upward scroll brings it back. */
+  .nav:global(.is-hidden) { transform: translate(-50%, calc(-100% - 24px)); }
 
   .bar {
     display: flex;
@@ -148,7 +154,20 @@ const isActive = (p: string) => path.startsWith(p);
   .mark circle { transition: transform var(--t-med) var(--ease); transform-origin: 25px 3.5px; }
   .brand:hover .mark circle { transform: scale(1.35); }
 
-  .links ul { display: flex; gap: 2px; }
+  .links ul { position: relative; display: flex; gap: 2px; }
+  /* A soft block that glides between items under the pointer. */
+  .hover-pill {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    border-radius: 10px;
+    background: light-dark(rgb(17 20 26 / 0.045), rgb(236 238 241 / 0.065));
+    opacity: 0;
+    pointer-events: none;
+    transition: transform 340ms var(--ease), width 340ms var(--ease), opacity 200ms var(--ease);
+  }
+  .hover-pill:global(.is-on) { opacity: 1; }
   .links a {
     position: relative;
     display: block;
@@ -183,8 +202,9 @@ const isActive = (p: string) => path.startsWith(p);
     font-size: var(--fs-xs);
     font-weight: 600;
     color: var(--ink-2);
-    transition: color var(--t-fast), background-color var(--t-fast);
+    transition: color var(--t-fast), background-color var(--t-fast), transform var(--t-fast) var(--ease);
   }
+  .tool:active { transform: scale(0.92); }
   .tool:hover { color: var(--ink); background: light-dark(rgb(17 20 26 / 0.06), rgb(236 238 241 / 0.09)); }
   .tool :global(svg) { width: 17px; height: 17px; }
   .tool kbd {
@@ -198,8 +218,15 @@ const isActive = (p: string) => path.startsWith(p);
   }
   .lang { font-family: var(--font-body); }
 
-  :global(html[data-theme='light']) .tool :global(.i-moon),
-  :global(html[data-theme='dark']) .tool :global(.i-sun) { display: none; }
+  /* Sun and moon trade places with a quarter turn instead of a cut. */
+  .swap { position: relative; display: block; width: 17px; height: 17px; }
+  .swap :global(svg) {
+    position: absolute;
+    inset: 0;
+    transition: opacity 260ms var(--ease), transform 460ms var(--ease);
+  }
+  :global(html[data-theme='light']) .swap :global(.i-moon),
+  :global(html[data-theme='dark']) .swap :global(.i-sun) { opacity: 0; transform: rotate(90deg) scale(0.4); }
 
   .burger { display: none; }
   .burger :global(.i-close) { display: none; }
@@ -215,6 +242,16 @@ const isActive = (p: string) => path.startsWith(p);
   .sheet ul { overflow: hidden; min-height: 0; padding-inline: 8px; }
   .nav:global(.is-open) .sheet { grid-template-rows: 1fr; visibility: visible; }
   .nav:global(.is-open) .sheet ul { padding-bottom: 10px; }
+  .sheet li {
+    opacity: 0;
+    transform: translateY(-6px);
+    transition: opacity 280ms var(--ease), transform 380ms var(--ease);
+  }
+  .nav:global(.is-open) .sheet li {
+    opacity: 1;
+    transform: none;
+    transition-delay: calc(60ms + var(--i, 0) * 35ms);
+  }
   .sheet a {
     display: block;
     padding: 11px 10px;
@@ -234,6 +271,8 @@ const isActive = (p: string) => path.startsWith(p);
     .nav:global(.is-open) { width: min(100% - 2 * var(--gutter), var(--max)); }
     /* Phones have the weakest GPUs: a solid bar costs nothing and reads the same. */
     .nav { border-color: var(--line); background: var(--glass-strong); }
+    /* Open, the menu covers the page, so it must be opaque to stay readable. */
+    .nav:global(.is-open) { background: var(--surface); }
     .bar { padding-inline: 10px 8px; }
     .nav::before { display: none; }
   }

@@ -13,7 +13,9 @@
  *
  * Performance model, in order of what mattered most when measured:
  *   - The layout arrives precomputed, so nothing simulates at load.
- *   - Two stacked canvases. The scene (map, links, nodes, labels) repaints only when
+ *   - The ink wash is its own small layer, placed with a CSS transform: zooming and
+ *     panning move it on the compositor instead of re-blending a full-screen image.
+ *   - Two stacked canvases. The scene (links, nodes, labels) repaints only when
  *     something in it changes. Continuous effects (signals, blooms) live on a thin
  *     overlay, so a highlighted node costs a few dots per frame, not a full repaint.
  *   - Labels are cached bitmaps: stroked text is the most expensive thing to draw.
@@ -186,6 +188,9 @@ export class InkGraph {
   private drag: { node?: SimNode; lastX: number; lastY: number; moved: number } | null = null;
   private pinch: { dist: number; k: number } | null = null;
   private wanderTimer = 0;
+  private zoomGoal: { k: number; sx: number; sy: number; wx: number; wy: number } | null = null;
+  private glide: { vx: number; vy: number } | null = null;
+  private velocity = { x: 0, y: 0, t: 0 };
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -199,6 +204,13 @@ export class InkGraph {
     this.fx.style.zIndex = getComputedStyle(canvas).zIndex;
     canvas.after(this.fx);
     this.fxCtx = this.fx.getContext('2d')!;
+
+    // The wash sits beneath the scene as its own element; see placeClouds().
+    const wash = this.cloud.style;
+    wash.cssText = 'position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;will-change:transform;opacity:0;transition:opacity 1.2s cubic-bezier(.22,.8,.24,1)';
+    wash.zIndex = getComputedStyle(canvas).zIndex;
+    this.cloud.setAttribute('aria-hidden', 'true');
+    if (opts.mode !== 'local') canvas.before(this.cloud);
 
     this.dark = opts.forceDark || document.documentElement.dataset.theme === 'dark';
     this.domains = data.domains;
@@ -341,6 +353,8 @@ export class InkGraph {
   }
 
   private flyCam(target: typeof this.cam, duration: number) {
+    this.zoomGoal = null;
+    this.glide = null;
     if (this.still) {
       this.cam = target;
       this.invalidate();
@@ -363,6 +377,8 @@ export class InkGraph {
   }
 
   zoomBy(factor: number, cx = this.w / 2, cy = this.h / 2, animate = true) {
+    this.zoomGoal = null;
+    this.glide = null;
     const k = clamp(this.cam.k * factor, 0.22, 4.5);
     const world = this.toWorld(cx, cy);
     const target = { k, x: cx - world.x * k, y: cy - world.y * k };
@@ -374,6 +390,46 @@ export class InkGraph {
       this.cam = target;
       this.invalidate();
     }
+  }
+
+  /** Wheel zoom eases toward its target around the pointer instead of jumping a notch. */
+  private wheelZoom(delta: number, sx: number, sy: number) {
+    this.camFrom = null;
+    this.camTo = null;
+    this.glide = null;
+    const k = clamp((this.zoomGoal?.k ?? this.cam.k) * Math.exp(-delta * 0.0016), 0.22, 4.5);
+    const world = this.toWorld(sx, sy);
+    this.zoomGoal = { k, sx, sy, wx: world.x, wy: world.y };
+    this.userMoved = true;
+    this.invalidate();
+  }
+
+  /** Eased zoom and the glide after a flung pan. True while either still moves the camera. */
+  private updateMotion(dt: number) {
+    let moving = false;
+    const goal = this.zoomGoal;
+    if (goal) {
+      let k = this.still ? goal.k : this.cam.k + (goal.k - this.cam.k) * (1 - Math.exp(-dt / 70));
+      if (Math.abs(goal.k - k) < goal.k * 0.001) {
+        k = goal.k;
+        this.zoomGoal = null;
+      } else {
+        moving = true;
+      }
+      this.cam = { k, x: goal.sx - goal.wx * k, y: goal.sy - goal.wy * k };
+      this.sceneDirty = true;
+    }
+    const glide = this.glide;
+    if (glide) {
+      this.cam = { ...this.cam, x: this.cam.x + glide.vx * dt, y: this.cam.y + glide.vy * dt };
+      const decay = Math.exp(-dt / 300);
+      glide.vx *= decay;
+      glide.vy *= decay;
+      if (Math.hypot(glide.vx, glide.vy) < 0.02) this.glide = null;
+      else moving = true;
+      this.sceneDirty = true;
+    }
+    return moving;
   }
 
   /* --- State --------------------------------------------------------------- */
@@ -562,6 +618,12 @@ export class InkGraph {
           this.cloudDirty = true;
           this.invalidate();
         } else if (full) {
+          const elapsed = Math.max(1, e.timeStamp - this.velocity.t);
+          this.velocity = {
+            x: this.velocity.x * 0.35 + (dx / elapsed) * 0.65,
+            y: this.velocity.y * 0.35 + (dy / elapsed) * 0.65,
+            t: e.timeStamp,
+          };
           this.camTo = null;
           this.cam.x += dx;
           this.cam.y += dy;
@@ -596,6 +658,9 @@ export class InkGraph {
         return;
       }
       this.stopWander();
+      this.glide = null;
+      this.zoomGoal = null;
+      this.velocity = { x: 0, y: 0, t: e.timeStamp };
       this.drag = { node: this.nodeAt(p.x, p.y) ?? undefined, lastX: p.x, lastY: p.y, moved: 0 };
       if (full) c.setPointerCapture(e.pointerId);
       if (full && !this.drag.node) c.style.cursor = 'grabbing';
@@ -614,6 +679,17 @@ export class InkGraph {
         if (drag.moved > 4) this.sim?.alphaTarget(0);
       }
       if (full) c.style.cursor = this.hover ? 'pointer' : 'grab';
+
+      // A flung map keeps gliding and slows to a stop, like paper sliding on a desk.
+      const recent = e.timeStamp - this.velocity.t < 70;
+      if (full && !drag.node && drag.moved > 6 && recent && !this.still) {
+        const speed = Math.hypot(this.velocity.x, this.velocity.y);
+        if (speed > 0.12) {
+          const cap = Math.min(1, 3 / speed);
+          this.glide = { vx: this.velocity.x * cap, vy: this.velocity.y * cap };
+          this.kick();
+        }
+      }
       if (drag.moved > 6) return;
 
       if (drag.node) {
@@ -638,7 +714,7 @@ export class InkGraph {
         (e) => {
           e.preventDefault();
           const p = local(e);
-          this.zoomBy(Math.exp(-e.deltaY * 0.0016), p.x, p.y, false);
+          this.wheelZoom(e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY, p.x, p.y);
         },
         { passive: false },
       );
@@ -756,6 +832,7 @@ export class InkGraph {
     const ease = this.still ? 1 : 1 - Math.exp(-dt / EASE_MS);
 
     let moving = this.updateCamera(now);
+    if (this.updateMotion(dt)) moving = true;
     const focus = this.hover ?? this.selected;
     const neighbours = focus?.neighbors;
     const onPath = new Set(this.path);
@@ -898,6 +975,8 @@ export class InkGraph {
     this.cloudBox = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     this.cloud.width = Math.ceil((x1 - x0) * scale);
     this.cloud.height = Math.ceil((y1 - y0) * scale);
+    this.cloud.style.width = `${x1 - x0}px`;
+    this.cloud.style.height = `${y1 - y0}px`;
 
     const g = this.cloud.getContext('2d')!;
     const { cloud, cloudAlpha } = this.palette;
@@ -937,20 +1016,7 @@ export class InkGraph {
 
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     c.clearRect(0, 0, w, h);
-
-    if (this.cloudBox.w) {
-      c.globalAlpha = 1;
-      c.imageSmoothingEnabled = true;
-      c.imageSmoothingQuality = 'low';
-      c.drawImage(
-        this.cloud,
-        this.cloudBox.x * cam.k + cam.x,
-        this.cloudBox.y * cam.k + cam.y,
-        this.cloudBox.w * cam.k,
-        this.cloudBox.h * cam.k,
-      );
-    }
-
+    this.placeClouds();
     this.paintLinks();
 
     for (const n of this.nodes) {
@@ -963,6 +1029,20 @@ export class InkGraph {
 
     this.paintLabels(this.paintRegions(focus), dotScale, focus);
     c.globalAlpha = 1;
+  }
+
+  /** Move the wash layer with the camera: a transform, so no pixels are redrawn. */
+  private placeClouds() {
+    if (this.opts.mode === 'local') return;
+    const { cam, cloudBox: box } = this;
+    const s = this.cloud.style;
+    if (!box.w) {
+      s.visibility = 'hidden';
+      return;
+    }
+    s.visibility = '';
+    s.transform = `translate(${(box.x * cam.k + cam.x).toFixed(2)}px, ${(box.y * cam.k + cam.y).toFixed(2)}px) scale(${cam.k.toFixed(5)})`;
+    if (s.opacity !== '1') s.opacity = '1';
   }
 
   /** One path per style instead of one per link. A bend gives a brush-drawn feel. */
@@ -1250,5 +1330,6 @@ export class InkGraph {
     this.stopWander();
     this.cleanups.forEach((fn) => fn());
     this.fx.remove();
+    this.cloud.remove();
   }
 }

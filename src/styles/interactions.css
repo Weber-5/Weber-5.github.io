@@ -1,0 +1,168 @@
+/* ==========================================================================
+   Interaction details
+   Everything here moves with transform and opacity, so it stays on the
+   compositor. The reduced-motion rule in global.css stills all of it.
+   ========================================================================== */
+
+html { -webkit-tap-highlight-color: transparent; }
+
+/* --- Focus: the ring settles in instead of snapping ------------------------ */
+
+:focus-visible { animation: focus-in 220ms var(--ease); }
+@keyframes focus-in {
+  from { outline-offset: 7px; outline-color: transparent; }
+}
+
+/* --- Press: a drop of ink spreads from where the pointer landed ------------ */
+
+:where(.btn, .filter, .tool, .to-top, [data-domain], [data-field], [data-type]) { position: relative; }
+
+.ink-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.ink-drop {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, currentColor, transparent);
+  opacity: 0.24;
+  transform: scale(0);
+  animation: ink-drop 640ms var(--ease) forwards;
+}
+@keyframes ink-drop {
+  55% { opacity: 0.16; }
+  to { transform: scale(1); opacity: 0; }
+}
+
+.filter:active,
+:where([data-domain], [data-field], [data-type]):active { transform: scale(0.96); }
+
+/* --- Tooltips: for icon-only controls, after a short, deliberate pause ------ */
+
+@media (hover: hover) {
+  [data-tip]::after {
+    content: attr(data-tip);
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    z-index: 30;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--ink);
+    color: var(--paper);
+    font: 500 0.6875rem/1.45 var(--font-body);
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    box-shadow: var(--shadow-2);
+    opacity: 0;
+    transform: translate(-50%, -4px);
+    pointer-events: none;
+    transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+  }
+  [data-tip-pos='top']::after {
+    top: auto;
+    bottom: calc(100% + 8px);
+    transform: translate(-50%, 4px);
+  }
+  [data-tip]:hover::after,
+  [data-tip]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    transition-delay: 380ms;
+  }
+}
+
+/* --- Toast: quiet confirmation for actions that leave no visible trace ------ */
+
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  box-shadow: var(--shadow-3);
+  opacity: 0;
+  transform: translate(-50%, 14px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 220ms var(--ease), transform 360ms var(--ease);
+}
+.toast::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+.toast.is-on { opacity: 1; transform: translate(-50%, 0) scale(1); }
+
+/* --- Back to top, with a ring that fills as you read ------------------------ */
+
+.to-top {
+  position: fixed;
+  right: max(16px, calc((100vw - var(--max)) / 2 - 68px));
+  bottom: 24px;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--glass-strong);
+  color: var(--ink-2);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  transform: translateY(12px) scale(0.9);
+  pointer-events: none;
+  transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease), color var(--t-fast);
+}
+.to-top.is-on { opacity: 1; transform: none; pointer-events: auto; }
+.to-top:hover { color: var(--blue); }
+.to-top:active { transform: scale(0.93); }
+.to-top .ring { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); transform: rotate(-90deg); }
+.to-top .ring circle { fill: none; stroke-width: 1.5; }
+.to-top .track { stroke: transparent; }
+.to-top .progress { stroke: var(--blue); stroke-dasharray: 100; stroke-dashoffset: 100; stroke-linecap: round; }
+.to-top .up { width: 16px; height: 16px; transform: rotate(-90deg); }
+
+/* --- Arriving at an anchor: a brief wash marks where you landed ------------- */
+
+:is(h2, h3, h4):target,
+.pub:target { animation: target-flash 1.9s var(--ease); border-radius: 6px; }
+section:target > h2 { animation: target-flash 1.9s var(--ease); border-radius: 6px; }
+@keyframes target-flash {
+  0%, 30% { background-color: var(--blue-wash); box-shadow: 0 0 0 8px var(--blue-wash); }
+  100% { background-color: transparent; box-shadow: 0 0 0 8px transparent; }
+}
+
+/* --- Counters keep their width while they count ----------------------------- */
+
+[data-count] {
+  display: inline-block;
+  min-width: calc(var(--d, 2) * 0.64em);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Copy confirmation ------------------------------------------------------ */
+
+[data-copy].is-done { color: var(--blue); animation: pop 360ms var(--ease); }
+@keyframes pop { 45% { transform: scale(1.08); } }
+
+@media print {
+  .toast, .to-top { display: none !important; }
+}

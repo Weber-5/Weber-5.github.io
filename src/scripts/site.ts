@@ -50,6 +50,26 @@ if (nav) {
   new IntersectionObserver(([entry]) => nav.classList.toggle('is-scrolled', !entry.isIntersecting)).observe(sentinel);
 }
 
+/* The hover block glides from item to item instead of each item lighting up alone. */
+const navList = nav?.querySelector<HTMLElement>('.links ul');
+const hoverPill = navList?.querySelector<HTMLElement>('[data-hover-pill]');
+if (navList && hoverPill && matchMedia('(hover: hover)').matches) {
+  const place = (link: HTMLElement) => {
+    const arriving = !hoverPill.classList.contains('is-on');
+    // Arriving from outside, it appears in place; only moves between items slide.
+    if (arriving) hoverPill.style.transition = 'opacity 200ms';
+    hoverPill.style.width = `${link.offsetWidth}px`;
+    hoverPill.style.transform = `translateX(${link.offsetLeft}px)`;
+    if (arriving) {
+      void hoverPill.offsetWidth;
+      hoverPill.style.transition = '';
+    }
+    hoverPill.classList.add('is-on');
+  };
+  navList.querySelectorAll<HTMLElement>('a').forEach((link) => link.addEventListener('pointerenter', () => place(link)));
+  navList.addEventListener('pointerleave', () => hoverPill.classList.remove('is-on'));
+}
+
 const setMenu = (open: boolean) => {
   nav?.classList.toggle('is-open', open);
   menuButton?.setAttribute('aria-expanded', String(open));
@@ -78,6 +98,61 @@ if (matchMedia('(hover: hover)').matches) {
     },
     { passive: true },
   );
+}
+
+/* --- Press feedback: a drop of ink spreads from where the pointer landed ------ */
+
+const PRESSABLE =
+  '.btn:not([aria-disabled="true"]), .filter, .tool, .to-top, [data-domain], [data-field], [data-type]';
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button !== 0 || reducedMotion()) return;
+    const host = (e.target as Element).closest?.<HTMLElement>(PRESSABLE);
+    if (!host) return;
+    const rect = host.getBoundingClientRect();
+    let clip = host.querySelector<HTMLElement>(':scope > .ink-clip');
+    if (!clip) {
+      clip = document.createElement('span');
+      clip.className = 'ink-clip';
+      clip.setAttribute('aria-hidden', 'true');
+      host.append(clip);
+    }
+    const drop = document.createElement('span');
+    drop.className = 'ink-drop';
+    drop.style.cssText = `left:${e.clientX - rect.left}px;top:${e.clientY - rect.top}px;--s:${Math.hypot(rect.width, rect.height) * 2}px`;
+    clip.append(drop);
+    drop.addEventListener('animationend', () => drop.remove(), { once: true });
+  },
+  { passive: true },
+);
+
+/* --- Counters run up to their value the first time they come into view ------- */
+
+const counters = document.querySelectorAll<HTMLElement>('[data-count]');
+if (counters.length && !reducedMotion()) {
+  const io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        io.unobserve(entry.target);
+        const el = entry.target as HTMLElement;
+        const end = Number(el.dataset.count);
+        const start = performance.now();
+        const tick = (now: number) => {
+          const u = Math.min(1, (now - start) / 1100);
+          el.textContent = String(Math.round(end * (1 - (1 - u) ** 3)));
+          if (u < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      }
+    },
+    { threshold: 0.6 },
+  );
+  counters.forEach((el) => {
+    el.textContent = '0';
+    io.observe(el);
+  });
 }
 
 /* --- Theme: dark ink spreads across the page from the toggle ----------------- */
@@ -152,6 +227,62 @@ async function openPalette() {
 
 document.querySelectorAll('[data-palette-open]').forEach((el) => el.addEventListener('click', openPalette));
 
+/* --- Reading comfort: the nav steps aside going down; a ring tracks progress -- */
+
+const toTop = document.querySelector<HTMLButtonElement>('[data-to-top]');
+const ring = toTop?.querySelector<SVGElement>('[data-ring]');
+if (nav || toTop) {
+  let lastY = scrollY;
+  let travel = 0;
+  let max = 1;
+  let queued = false;
+  const measure = () => {
+    max = Math.max(1, document.documentElement.scrollHeight - innerHeight);
+  };
+  measure();
+  new ResizeObserver(measure).observe(document.body);
+
+  let hidden = false;
+  let shown = false;
+  let offset = '';
+  const update = () => {
+    queued = false;
+    const y = scrollY;
+    const dy = y - lastY;
+    lastY = y;
+    // Direction must hold for a stretch, so trackpad jitter never flickers the bar.
+    travel = Math.sign(dy) === Math.sign(travel) ? travel + dy : dy;
+    if (nav) {
+      const pinned =
+        y < innerHeight * 0.5 || nav.classList.contains('is-open') || nav.contains(document.activeElement) || !!palette?.open;
+      const hide = pinned || travel < -24 ? false : travel > 32 ? true : hidden;
+      if (hide !== hidden) nav.classList.toggle('is-hidden', (hidden = hide));
+    }
+    if (toTop && ring) {
+      const show = y > innerHeight * 1.1;
+      if (show !== shown) toTop.classList.toggle('is-on', (shown = show));
+      // Whole percent steps are invisible at this size and spare most style passes.
+      const next = String(Math.round(100 - Math.min(1, y / max) * 100));
+      if (show && next !== offset) ring.style.strokeDashoffset = offset = next;
+    }
+  };
+  addEventListener(
+    'scroll',
+    () => {
+      if (!queued) {
+        queued = true;
+        requestAnimationFrame(update);
+      }
+    },
+    { passive: true },
+  );
+  nav?.addEventListener('focusin', () => {
+    hidden = false;
+    nav.classList.remove('is-hidden');
+  });
+  toTop?.addEventListener('click', () => scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' }));
+}
+
 addEventListener('keydown', (e) => {
   const typing = (e.target as HTMLElement).closest?.('input, textarea, select, [contenteditable]');
   if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
@@ -170,11 +301,19 @@ document.addEventListener('click', async (e) => {
     ? document.getElementById(button.dataset.copy)
     : button.parentElement?.querySelector('code, pre');
   if (!source?.textContent) return;
-  await navigator.clipboard.writeText(source.textContent);
+  try {
+    await navigator.clipboard.writeText(source.textContent);
+  } catch {
+    return;
+  }
   const label = button.querySelector('[data-copy-label]') ?? button;
   const previous = label.textContent;
   label.textContent = button.dataset.copied ?? 'Copied';
-  setTimeout(() => (label.textContent = previous), 1400);
+  button.classList.add('is-done');
+  setTimeout(() => {
+    label.textContent = previous;
+    button.classList.remove('is-done');
+  }, 1400);
 });
 
 /* --- Hero landscape: only pages that have one load the code ------------------ */
