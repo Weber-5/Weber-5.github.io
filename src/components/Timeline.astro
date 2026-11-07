@@ -1,0 +1,93 @@
+---
+import { tr, useT, type Lang } from '../i18n';
+import type { TimelineItem } from '../lib/data';
+
+interface Props {
+  items: TimelineItem[];
+  lang: Lang;
+}
+
+const { items, lang } = Astro.props;
+const t = useT(lang);
+---
+
+<ol class="timeline">
+  {items.map((item, i) => {
+    const org = [tr(item.org, lang), tr(item.place, lang)].filter(Boolean).join(' · ');
+    const detail = tr(item.detail, lang);
+    return (
+      <li data-reveal style={`--i:${i}`}>
+        <p class="label period">{item.period}</p>
+        <div>
+          <h3>
+            {tr(item.title, lang)}
+            {item.placeholder && <span class="chip chip-ph no-print">{t('placeholder.chip')}</span>}
+          </h3>
+          {org && <p class="org">{org}</p>}
+          {detail && <p class="detail">{detail}</p>}
+          {item.bullets.length > 0 && (
+            <ul>
+              {item.bullets.map((b) => <li>{tr(b, lang)}</li>)}
+            </ul>
+          )}
+        </div>
+      </li>
+    );
+  })}
+</ol>
+
+<style>
+  .timeline > li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 128px 1fr;
+    gap: 4px 28px;
+    padding: 0 0 26px;
+  }
+  .timeline > li > div {
+    position: relative;
+    padding-left: 24px;
+    border-left: 1px solid var(--line-2);
+  }
+  /* The node on the rail */
+  .timeline > li > div::before {
+    content: '';
+    position: absolute;
+    top: 7px;
+    left: -4px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--paper);
+    box-shadow: 0 0 0 1.5px var(--ink-3);
+    transition: box-shadow var(--t-med) var(--ease), background-color var(--t-med);
+  }
+  .timeline > li:hover > div::before { background: var(--blue); box-shadow: 0 0 0 4px var(--blue-wash); }
+  .timeline > li:first-child > div::before { background: var(--blue); box-shadow: 0 0 0 1.5px var(--blue); }
+  .period { padding-top: 3px; }
+  h3 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    font-size: var(--fs-lg);
+    letter-spacing: -0.012em;
+  }
+  .org { font-size: var(--fs-sm); color: var(--ink-3); }
+  .detail, ul { margin-top: 6px; font-size: var(--fs-sm); color: var(--ink-2); }
+  ul { display: grid; gap: 3px; }
+  ul li { position: relative; padding-left: 14px; }
+  ul li::before {
+    content: '';
+    position: absolute;
+    top: 0.72em;
+    left: 0;
+    width: 6px;
+    height: 1px;
+    background: var(--ink-3);
+  }
+  @media (max-width: 560px) {
+    .timeline > li { grid-template-columns: 1fr; }
+    .period { padding-left: 25px; }
+  }
+</style>

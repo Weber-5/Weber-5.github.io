@@ -1,0 +1,107 @@
+---
+import Base from '../../../layouts/Base.astro';
+import SectionHead from '../../../components/SectionHead.astro';
+import PublicationRow from '../../../components/PublicationRow.astro';
+import Timeline from '../../../components/Timeline.astro';
+import { localeParams, tr, useT, type Lang, type UiKey } from '../../../i18n';
+import { getPublications, getResearch } from '../../../lib/data';
+
+export const getStaticPaths = localeParams;
+
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const research = getResearch();
+const papers = getPublications();
+const types = [...new Set(papers.map((p) => p.type))];
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@graph': papers
+    .filter((p) => !p.placeholder)
+    .map((p) => ({
+      '@type': 'ScholarlyArticle',
+      headline: tr(p.title, lang),
+      author: p.authors.map((a) => ({ '@type': 'Person', name: a.replace(/^\*/, '') })),
+      datePublished: String(p.year),
+      isPartOf: tr(p.venue, lang),
+    })),
+};
+---
+
+<Base lang={lang} title={t('research.title')} description={tr(research.intro, lang)} jsonLd={jsonLd}>
+  <header class="page-head wrap">
+    <h1 data-reveal>{t('research.title')}</h1>
+    <p class="lead" data-reveal style="--i:1">{tr(research.intro, lang) || t('research.lead')}</p>
+  </header>
+
+  <section class="section wrap" aria-labelledby="directions">
+    <SectionHead index="01" id="directions" title={t('research.directions')} />
+    <div class="directions">
+      {research.directions.map((d, i) => (
+        <article class="card direction" data-reveal style={`--i:${i}`}>
+          <span class="label num">{String(i + 1).padStart(2, '0')}</span>
+          <h3>{tr(d.title, lang)}</h3>
+          <p>{tr(d.summary, lang)}</p>
+          <div class="tags">
+            {d.placeholder && <span class="chip chip-ph">{t('placeholder.chip')}</span>}
+            {d.keywords.map((k) => <span class="chip">{k}</span>)}
+          </div>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <section class="section wrap" aria-labelledby="publications">
+    <SectionHead index="02" id="publications" title={t('research.publications')} />
+    <div class="filters" role="group" aria-label={t('research.publications')} data-reveal>
+      <button class="filter" type="button" data-pub-filter="" aria-pressed="true">{t('research.filter.all')}</button>
+      {types.map((type) => (
+        <button class="filter" type="button" data-pub-filter={type} aria-pressed="false">{t(`pub.${type}` as UiKey)}</button>
+      ))}
+    </div>
+    <div>
+      {papers.map((paper) => <PublicationRow paper={paper} lang={lang} detailed />)}
+    </div>
+  </section>
+
+  <section class="section wrap" aria-labelledby="experience">
+    <SectionHead index="03" id="experience" title={t('research.experience')} />
+    <Timeline items={research.experience} lang={lang} />
+  </section>
+</Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-pub-filter]');
+  const rows = document.querySelectorAll<HTMLElement>('[data-pub-type]');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const type = button.dataset.pubFilter;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      rows.forEach((row) => {
+        row.hidden = !!type && row.dataset.pubType !== type;
+      });
+    });
+  });
+</script>
+
+<style>
+  .directions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .direction {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px;
+  }
+  .num { color: var(--blue); }
+  h3 { font-size: var(--fs-xl); letter-spacing: -0.02em; }
+  .direction p { flex: 1; font-size: var(--fs-sm); color: var(--ink-2); }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+  @media (max-width: 860px) {
+    .directions { grid-template-columns: 1fr; }
+  }
+</style>

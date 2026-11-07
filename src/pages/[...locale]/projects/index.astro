@@ -1,0 +1,56 @@
+---
+import { getCollection } from 'astro:content';
+import Base from '../../../layouts/Base.astro';
+import ProjectCard from '../../../components/ProjectCard.astro';
+import { localeParams, useT, type Lang } from '../../../i18n';
+
+export const getStaticPaths = localeParams;
+
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const projects = (await getCollection('projects')).sort((a, b) => a.data.order - b.data.order);
+const tags = [...new Set(projects.flatMap((p) => p.data.tags))];
+---
+
+<Base lang={lang} title={t('projects.title')} description={t('projects.lead')}>
+  <header class="page-head wrap">
+    <h1 data-reveal>{t('projects.title')}</h1>
+    <p class="lead" data-reveal style="--i:1">{t('projects.lead')}</p>
+  </header>
+
+  <section class="wrap">
+    <div class="filters" role="group" aria-label={t('projects.stack')} data-reveal>
+      <button class="filter" type="button" data-tag-filter="" aria-pressed="true">{t('research.filter.all')}</button>
+      {tags.map((tag) => (
+        <button class="filter" type="button" data-tag-filter={tag} aria-pressed="false">{tag}</button>
+      ))}
+    </div>
+    <div class="grid">
+      {projects.map((project, i) => <ProjectCard project={project} lang={lang} i={i % 3} variant={i % 3} />)}
+    </div>
+  </section>
+</Base>
+
+<script>
+  const buttons = document.querySelectorAll<HTMLButtonElement>('[data-tag-filter]');
+  const cards = document.querySelectorAll<HTMLElement>('[data-project-tags]');
+  buttons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const tag = button.dataset.tagFilter!;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      cards.forEach((card) => {
+        card.hidden = !!tag && !card.dataset.projectTags!.split('|').includes(tag);
+      });
+    });
+  });
+</script>
+
+<style>
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 24px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+    gap: 16px;
+  }
+  .grid :global([hidden]) { display: none; }
+</style>

@@ -1,0 +1,59 @@
+---
+/* The social share image. scripts/postbuild.mjs screenshots this page to /og.png. */
+import '@fontsource-variable/manrope';
+import '@fontsource-variable/jetbrains-mono';
+import { tr } from '../i18n';
+import { getProfile } from '../lib/data';
+import { rng, ridge, areaPath, linePath } from '../lib/ink';
+
+const profile = getProfile();
+const rand = rng('og');
+const ranges = [0, 1, 2, 3].map((i) => ({
+  points: ridge(rand, { width: 1200, base: 400 + i * 62, amp: 52 - i * 6, steps: 160 }),
+  tone: 0.12 + i * 0.13,
+}));
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Share image</title>
+  </head>
+  <body>
+    <svg viewBox="0 0 1200 630" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#11141a" stop-opacity="0.5"></stop>
+          <stop offset="0.7" stop-color="#11141a" stop-opacity="0"></stop>
+        </linearGradient>
+        <radialGradient id="sun">
+          <stop offset="0" stop-color="#1f4fa8" stop-opacity="0.5"></stop>
+          <stop offset="1" stop-color="#1f4fa8" stop-opacity="0"></stop>
+        </radialGradient>
+      </defs>
+      <circle cx="940" cy="230" r="170" fill="url(#sun)"></circle>
+      {ranges.map((r) => (
+        <g>
+          <path d={areaPath(r.points, 630)} fill="url(#wash)" opacity={r.tone}></path>
+          <path d={linePath(r.points)} stroke="#11141a" stroke-opacity={r.tone}></path>
+        </g>
+      ))}
+    </svg>
+    <main>
+      <p class="eyebrow">{tr(profile.affiliation, 'en')}</p>
+      <h1>{tr(profile.name, 'en')}</h1>
+      <p class="role">{tr(profile.role, 'en')}</p>
+    </main>
+  </body>
+</html>
+
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #f6f7f8; }
+  svg { position: absolute; inset: 0; width: 1200px; height: 630px; }
+  main { position: relative; padding: 76px 84px; color: #11141a; }
+  .eyebrow { margin: 0; font: 500 19px 'JetBrains Mono Variable', monospace; letter-spacing: 0.02em; color: #1f4fa8; }
+  h1 { margin: 22px 0 0 -6px; font: 600 148px/1 'Manrope Variable', sans-serif; letter-spacing: -0.055em; }
+  .role { margin: 22px 0 0; font: 500 32px 'Manrope Variable', sans-serif; letter-spacing: -0.015em; color: #3f4650; }
+</style>

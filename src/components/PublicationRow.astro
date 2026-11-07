@@ -1,0 +1,166 @@
+---
+import Icon from './Icon.astro';
+import { tr, useT, type Lang, type UiKey } from '../i18n';
+import { authorsHtml, type Publication } from '../lib/data';
+
+interface Props {
+  paper: Publication;
+  lang: Lang;
+  /** The Research page adds the abstract and citation disclosures. */
+  detailed?: boolean;
+  i?: number;
+}
+
+const { paper, lang, detailed = false, i = 0 } = Astro.props;
+const t = useT(lang);
+const abstract = tr(paper.abstract, lang);
+const bibId = `bib-${paper.id}`;
+---
+
+<article
+  class="pub"
+  id={detailed ? paper.id : undefined}
+  data-reveal
+  style={`--i:${i}`}
+  data-pub-type={paper.type}
+  data-pub-topics={paper.topics.join('|')}
+>
+  <p class="year label">{paper.year}</p>
+  <div class="body">
+    <h3>{tr(paper.title, lang)}</h3>
+    <p class="authors" set:html={authorsHtml(paper.authors)} />
+    <p class="venue">
+      <em>{tr(paper.venue, lang)}</em>
+      {paper.note && <span class="note"> · {tr(paper.note, lang)}</span>}
+    </p>
+    <div class="meta">
+      <span class="chip">{t(`pub.${paper.type}` as UiKey)}</span>
+      {paper.placeholder && <span class="chip chip-ph">{t('placeholder.chip')}</span>}
+      {Object.entries(paper.links).map(([label, url]) => (
+        <a class="chip" href={url}>{label.toUpperCase()}</a>
+      ))}
+    </div>
+
+    {detailed && (abstract || paper.bibtex) && (
+      <div class="more">
+        {abstract && (
+          <details>
+            <summary>{t('research.abstract')}</summary>
+            <p>{abstract}</p>
+          </details>
+        )}
+        {paper.bibtex && (
+          <details>
+            <summary>{t('research.cite')}</summary>
+            <div class="bib">
+              <pre id={bibId}>{paper.bibtex}</pre>
+              <button type="button" class="copy" data-copy={bibId} data-copied={t('research.copied')}>
+                <Icon name="copy" />
+                <span data-copy-label>{t('research.copy')}</span>
+              </button>
+            </div>
+          </details>
+        )}
+      </div>
+    )}
+  </div>
+</article>
+
+<style>
+  .pub {
+    position: relative;
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 8px 24px;
+    padding: 24px 0;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: calc(var(--nav-h) + 40px);
+  }
+  /* A tick of blue grows from the rule on hover. */
+  .pub::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 72px;
+    height: 1px;
+    background: var(--blue);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--t-med) var(--ease);
+  }
+  .pub:hover::before { transform: scaleX(1); }
+  .pub:target::before { transform: scaleX(1); }
+  .pub:target h3 { color: var(--blue); }
+  .year { padding-top: 4px; }
+  h3 {
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.012em;
+    transition: color var(--t-fast);
+  }
+  .authors, .venue { font-size: var(--fs-sm); color: var(--ink-2); }
+  .authors { margin-top: 6px; }
+  .authors :global(strong) { color: var(--ink); font-weight: 600; }
+  .venue { color: var(--ink-3); }
+  .venue em { font-style: italic; }
+  :global(:lang(zh)) .venue em { font-style: normal; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+
+  .more { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 12px; }
+  details { min-width: 0; }
+  details[open] { flex-basis: 100%; }
+  summary {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-2);
+    cursor: pointer;
+    list-style: none;
+    transition: color var(--t-fast);
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: '+';
+    width: 0.7em;
+    font-family: var(--font-mono);
+    color: var(--blue);
+  }
+  details[open] > summary::before { content: '\2212'; }
+  summary:hover { color: var(--blue); }
+  details p { margin-top: 8px; max-width: 70ch; font-size: var(--fs-sm); color: var(--ink-2); }
+  .bib { position: relative; margin-top: 8px; }
+  pre {
+    overflow-x: auto;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    line-height: 1.7;
+  }
+  .copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    background: var(--surface);
+  }
+  .copy:hover { color: var(--blue); }
+  .copy :global(svg) { width: 13px; height: 13px; }
+
+  @media (max-width: 560px) {
+    .pub { grid-template-columns: 1fr; gap: 2px; }
+  }
+</style>

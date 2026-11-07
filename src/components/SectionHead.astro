@@ -1,0 +1,54 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  index: string;
+  title: string;
+  id?: string;
+  link?: { href: string; label: string };
+}
+
+const { index, title, id, link } = Astro.props;
+---
+
+<header class="head" data-reveal>
+  <span class="label idx">§ {index}</span>
+  <h2 id={id}>{title}</h2>
+  <span class="rule" aria-hidden="true"></span>
+  {link && (
+    <a class="text-link" href={link.href}>
+      {link.label}
+      <Icon name="arrow" />
+    </a>
+  )}
+</header>
+
+<style>
+  .head {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-bottom: clamp(28px, 4vw, 48px);
+  }
+  .idx { color: var(--blue); flex: none; }
+  h2 {
+    font-size: var(--fs-2xl);
+    letter-spacing: -0.028em;
+    scroll-margin-top: calc(var(--nav-h) + 40px);
+  }
+  :global(:lang(zh)) h2 { letter-spacing: 0; }
+  .rule {
+    flex: 1;
+    height: 1px;
+    min-width: 20px;
+    align-self: center;
+    background: var(--line);
+  }
+  .text-link { flex: none; }
+  @media (max-width: 560px) {
+    .head { flex-wrap: wrap; }
+    .rule { display: none; }
+    .idx { width: 100%; margin-bottom: -10px; }
+    .text-link { margin-left: auto; }
+  }
+</style>

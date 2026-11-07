@@ -1,0 +1,55 @@
+# The CV page. The PDF is printed from this page at build time, so there is one
+# source of truth. To use a hand-made PDF instead, put it in public/ and set `pdf`.
+
+summary:
+  en: A two-sentence professional summary goes here.
+  zh: 这里是两句话的个人概述占位。
+
+pdf: ''
+
+education:
+  - title: { en: Degree and major, zh: 学位与专业 }
+    org: { en: University name, zh: 学校名称 }
+    place: { en: City, Country, zh: 城市，国家 }
+    period: 20XX – 20XX
+    detail: { en: 'GPA, ranking, advisor or thesis title.', zh: 绩点、排名、导师或论文题目。 }
+    placeholder: true
+
+experience:
+  - title: { en: Position title, zh: 职位名称 }
+    org: { en: Organization, zh: 单位名称 }
+    place: { en: City, Country, zh: 城市，国家 }
+    period: 20XX – 20XX
+    bullets:
+      - { en: What you did and the measurable result., zh: 你做了什么，以及可衡量的结果。 }
+      - { en: What you did and the measurable result., zh: 你做了什么，以及可衡量的结果。 }
+    placeholder: true
+  - title: { en: Position title, zh: 职位名称 }
+    org: { en: Organization, zh: 单位名称 }
+    place: { en: City, Country, zh: 城市，国家 }
+    period: 20XX – 20XX
+    bullets:
+      - { en: What you did and the measurable result., zh: 你做了什么，以及可衡量的结果。 }
+    placeholder: true
+
+awards:
+  - title: { en: Award name, zh: 奖项名称 }
+    org: { en: Awarding body, zh: 颁奖机构 }
+    period: 20XX
+    placeholder: true
+  - title: { en: Award name, zh: 奖项名称 }
+    org: { en: Awarding body, zh: 颁奖机构 }
+    period: 20XX
+    placeholder: true
+
+skills:
+  - group: { en: Languages, zh: 编程语言 }
+    items: [Skill, Skill, Skill]
+  - group: { en: Tools, zh: 工具 }
+    items: [Skill, Skill, Skill]
+  - group: { en: Methods, zh: 方法 }
+    items: [Skill, Skill]
+
+background:
+  en: A short personal paragraph goes here, for the things a list cannot say.
+  zh: 这里是一小段个人背景占位，写下列表说不清楚的部分。

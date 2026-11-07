@@ -1,0 +1,556 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Icon from '../../../components/Icon.astro';
+import { href, localeParams, useT, type Lang } from '../../../i18n';
+import { buildGraph, graphStats } from '../../../lib/graph';
+
+export const getStaticPaths = localeParams;
+
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const graph = await buildGraph();
+const stats = graphStats(graph);
+
+const countIn = (domain: string, field?: string) =>
+  graph.nodes.filter((n) => n.domain === domain && (!field || n.field === field) && n.type === 'note').length;
+
+const strings = {
+  open: t('graph.open'),
+  openPaper: t('graph.openPaper'),
+  openProject: t('graph.openProject'),
+  ghostHint: t('graph.ghostHint'),
+  tracePick: t('graph.trace.pick'),
+  traceNone: t('graph.trace.none'),
+  traceHops: t('graph.trace.hops'),
+  'type.note': t('palette.note'),
+  'type.ghost': t('graph.type.ghost'),
+  'type.paper': t('palette.paper'),
+  'type.project': t('palette.project'),
+};
+
+const types = [
+  { id: 'note', label: t('graph.type.note') },
+  { id: 'ghost', label: t('graph.type.ghost') },
+  { id: 'paper', label: t('graph.type.paper') },
+  { id: 'project', label: t('graph.type.project') },
+];
+
+const listed = (domain: string, field?: string) =>
+  graph.nodes
+    .filter((n) => n.domain === domain && n.field === field && n.url)
+    .sort((a, b) => a.title[lang].localeCompare(b.title[lang], lang));
+---
+
+<Base lang={lang} title={t('graph.title')} description={t('graph.lead')} bare>
+  <div class="explorer" data-explorer data-lang={lang} data-strings={JSON.stringify(strings)}>
+    <canvas class="map" tabindex="0" aria-label={t('graph.canvas')}></canvas>
+    <p class="sr-only" aria-live="polite" data-live></p>
+
+    <section class="panel" data-panel aria-label={t('graph.title')}>
+      <details class="panel-fold" open>
+        <summary>
+          <h1>{t('graph.title')}</h1>
+          <Icon name="menu" class="fold-icon" />
+        </summary>
+        <div class="panel-body">
+          <p class="lead">{t('graph.lead')}</p>
+          <dl class="stats">
+            <div><dt>{t('graph.stat.notes')}</dt><dd>{stats.notes}</dd></div>
+            <div><dt>{t('graph.stat.links')}</dt><dd>{stats.links}</dd></div>
+            <div><dt>{t('graph.stat.fields')}</dt><dd>{stats.fields}</dd></div>
+          </dl>
+
+          <div class="search">
+            <Icon name="search" />
+            <input type="search" data-search placeholder={t('graph.search')} aria-label={t('graph.search')} autocomplete="off" />
+            <ul class="results" data-results hidden></ul>
+          </div>
+
+          <p class="label group-label">{t('graph.domains')}</p>
+          <ul class="taxonomy">
+            {graph.domains.map((domain) => (
+              <li class="group" data-group={domain.id}>
+                <button type="button" class="domain" data-domain={domain.id} aria-pressed="false">
+                  <span>{domain.name[lang]}</span>
+                  <span class="label">{countIn(domain.id)}</span>
+                </button>
+                <div class="fields">
+                  <div class="fields-inner">
+                    {domain.fields.map((field) => (
+                      <button type="button" class="field" data-field={field.id} aria-pressed="false">{field.name[lang]}</button>
+                    ))}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <p class="label group-label">{t('graph.types')}</p>
+          <div class="types">
+            {types.map((type) => (
+              <button type="button" class="type" data-type={type.id} aria-pressed="true">
+                <span class="glyph" data-glyph={type.id} aria-hidden="true"></span>
+                {type.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </details>
+    </section>
+    <script is:inline>
+      if (innerWidth <= 900) document.querySelector('.panel-fold').open = false;
+    </script>
+
+    <aside class="detail" data-detail aria-hidden="true">
+      <button type="button" class="close" data-d-close aria-label={t('graph.close')}>
+        <Icon name="close" />
+      </button>
+      <p class="label" data-d-kind></p>
+      <h2 data-d-title></h2>
+      <p class="crumb" data-d-crumb></p>
+      <p class="summary" data-d-summary></p>
+      <a class="btn btn-primary" data-d-open href="#">
+        <span data-d-open-label></span>
+        <Icon name="arrow" />
+      </a>
+      <p class="label neighbors-label">{t('graph.neighbors')} · <span data-d-count></span></p>
+      <ul class="neighbors" data-d-neighbors></ul>
+    </aside>
+
+    <div class="trace-card" data-trace-card hidden>
+      <div class="ends">
+        <span><small class="label">{t('graph.trace.from')}</small><b data-trace-from></b></span>
+        <Icon name="arrow" />
+        <span><small class="label">{t('graph.trace.to')}</small><b data-trace-to></b></span>
+        <button type="button" class="text-link" data-trace-clear>{t('graph.trace.clear')}</button>
+      </div>
+      <p class="trace-result" data-trace-result aria-live="polite"></p>
+    </div>
+
+    <div class="dock" data-dock role="toolbar" aria-label={t('graph.title')}>
+      <button type="button" class="tool" data-trace aria-pressed="false" title={t('graph.trace')}>
+        <Icon name="route" />
+        <span>{t('graph.trace')}</span>
+      </button>
+      <button type="button" class="tool" data-wander aria-pressed="false" title={t('graph.wander')}>
+        <Icon name="compass" />
+        <span>{t('graph.wander')}</span>
+      </button>
+      <span class="sep" aria-hidden="true"></span>
+      <div class="grow">
+        <button type="button" class="tool" data-grow aria-pressed="false" title={t('graph.grow')} aria-label={t('graph.grow')}>
+          <Icon name="play" />
+        </button>
+        <input type="range" min="0" max="1000" value="1000" data-grow-range aria-label={t('graph.grow')} />
+        <output class="label" data-grow-date></output>
+      </div>
+      <span class="sep" aria-hidden="true"></span>
+      <button type="button" class="tool icon" data-zoom-out aria-label={t('graph.zoomOut')}><Icon name="minus" /></button>
+      <button type="button" class="tool icon" data-zoom-in aria-label={t('graph.zoomIn')}><Icon name="plus" /></button>
+      <button type="button" class="tool icon" data-fit aria-label={t('graph.fit')}><Icon name="fit" /></button>
+      <button type="button" class="tool icon" data-list-toggle aria-pressed="false" aria-label={t('graph.list')} title={t('graph.list')}><Icon name="list" /></button>
+    </div>
+
+    <p class="hint label">{t('graph.hint')}</p>
+
+    <!-- The same knowledge as plain links: for keyboards, screen readers and crawlers. -->
+    <section class="list" data-list hidden aria-label={t('graph.list')}>
+      <div class="wrap">
+        {graph.domains.map((domain) => (
+          <div class="list-domain">
+            <h2>{domain.name[lang]}</h2>
+            <div class="list-fields">
+              {domain.fields.map((field) => (
+                <div>
+                  <h3 class="label">{field.name[lang]}</h3>
+                  <ul>
+                    {listed(domain.id, field.id).map((n) => (
+                      <li><a href={href(n.url!, lang)}>{n.title[lang]}</a></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+    <noscript>
+      <style>.list[hidden] { display: block; position: static; } .map, .panel, .dock, .hint { display: none; }</style>
+    </noscript>
+  </div>
+</Base>
+
+<script>
+  import { initExplorer } from '../../../scripts/graph/explorer';
+  const root = document.querySelector<HTMLElement>('[data-explorer]');
+  if (root) initExplorer(root);
+</script>
+
+<style>
+  .explorer {
+    position: relative;
+    height: 100dvh;
+    min-height: 560px;
+    overflow: hidden;
+    background:
+      radial-gradient(60% 50% at 60% 30%, var(--blue-wash), transparent 70%),
+      var(--paper);
+  }
+  .map {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+    touch-action: none;
+    opacity: 0;
+    transition: opacity 1.2s var(--ease);
+    outline: none;
+  }
+  .map:global(.is-ready) { opacity: 1; }
+  .map:focus-visible { box-shadow: inset 0 0 0 2px var(--blue); }
+
+  /* Shared glass surface */
+  .panel, .detail, .dock, .trace-card {
+    border: 1px solid var(--line);
+    background: var(--glass);
+    backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: var(--shadow-2);
+  }
+
+  /* --- Left panel --- */
+  .panel {
+    position: absolute;
+    top: calc(var(--nav-h) + 30px);
+    left: var(--gutter);
+    z-index: 5;
+    width: 288px;
+    max-height: calc(100dvh - var(--nav-h) - 116px);
+    overflow-y: auto;
+    border-radius: var(--radius);
+    scrollbar-width: thin;
+  }
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 18px 0;
+    list-style: none;
+    cursor: default;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary :global(.fold-icon) { display: none; width: 18px; height: 18px; color: var(--ink-3); }
+  h1 { font-size: 1.375rem; letter-spacing: -0.028em; }
+  :global(:lang(zh)) h1 { letter-spacing: 0; }
+  .panel-body { padding: 8px 18px 16px; }
+  .lead { font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-3); }
+  .stats { display: flex; gap: 20px; margin-top: 12px; }
+  .stats div { display: flex; flex-direction: column-reverse; }
+  .stats dd {
+    font-family: var(--font-display);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .stats dt { font-family: var(--font-mono); font-size: 0.625rem; color: var(--ink-3); }
+
+  .search { position: relative; margin-top: 14px; }
+  .search > :global(svg) {
+    position: absolute;
+    top: 10px;
+    left: 11px;
+    width: 15px;
+    height: 15px;
+    color: var(--ink-3);
+    pointer-events: none;
+  }
+  .search input {
+    width: 100%;
+    height: 36px;
+    padding: 0 10px 0 33px;
+    border: 1px solid var(--line-2);
+    border-radius: 9px;
+    outline: none;
+    background: var(--surface);
+    font-size: var(--fs-sm);
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  }
+  .search input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+  .results {
+    margin-top: 6px;
+    padding: 4px;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface);
+  }
+  .results :global(button) {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: var(--fs-sm);
+    text-align: left;
+  }
+  .results :global(button small) { font-size: 0.625rem; color: var(--ink-3); flex: none; }
+  .results :global(button:hover), .results :global(button.is-active) { background: var(--blue-wash); color: var(--blue); }
+
+  .group-label { margin-block: 16px 6px; font-size: 0.6875rem; }
+  .taxonomy { display: grid; gap: 2px; }
+  .domain {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 7px;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    text-align: left;
+    transition: background-color var(--t-fast), color var(--t-fast);
+  }
+  .domain:hover { background: var(--blue-wash); }
+  .domain[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+  .domain[aria-pressed='true'] .label { color: inherit; opacity: 0.7; }
+  .domain .label { font-size: 0.6875rem; }
+
+  /* Fields fold open under their category; the rest of the time they stay out of the way. */
+  .fields {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--t-med) var(--ease);
+  }
+  .group:global(.is-open) .fields, .group:hover .fields, .group:focus-within .fields { grid-template-rows: 1fr; }
+  .fields-inner {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    min-height: 0;
+    overflow: hidden;
+    padding-inline: 8px;
+  }
+  .group:global(.is-open) .fields-inner, .group:hover .fields-inner, .group:focus-within .fields-inner { padding-block: 5px 7px; }
+  .field {
+    padding: 1px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    font-size: var(--fs-xs);
+    color: var(--ink-2);
+    transition: all var(--t-fast);
+  }
+  .field:hover { border-color: var(--blue); color: var(--blue); }
+  .field[aria-pressed='true'] { background: var(--blue); border-color: var(--blue); color: light-dark(#fff, #0c0e11); }
+
+  .types { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 6px; }
+  .type {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: var(--fs-xs);
+    color: var(--ink-2);
+    transition: opacity var(--t-fast), background-color var(--t-fast);
+  }
+  .type:hover { background: var(--blue-wash); }
+  .type[aria-pressed='false'] { opacity: 0.4; text-decoration: line-through; }
+  .glyph { width: 9px; height: 9px; flex: none; }
+  .glyph[data-glyph='note'] { border-radius: 50%; background: var(--ink); }
+  .glyph[data-glyph='ghost'] { border-radius: 50%; border: 1.2px solid var(--ink-3); }
+  .glyph[data-glyph='paper'] { background: var(--blue); transform: rotate(45deg) scale(0.85); }
+  .glyph[data-glyph='project'] { border-radius: 2px; background: var(--blue); }
+
+  /* --- Detail panel --- */
+  .detail {
+    position: absolute;
+    top: calc(var(--nav-h) + 30px);
+    right: var(--gutter);
+    z-index: 5;
+    width: 300px;
+    max-height: calc(100dvh - var(--nav-h) - 116px);
+    overflow-y: auto;
+    padding: 18px;
+    border-radius: var(--radius);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateX(14px);
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease), visibility var(--t-med);
+    scrollbar-width: thin;
+  }
+  .detail:global(.is-open) { opacity: 1; visibility: visible; transform: none; }
+  .close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 4px;
+    border-radius: 6px;
+    color: var(--ink-3);
+  }
+  .close:hover { color: var(--ink); background: var(--blue-wash); }
+  .close :global(svg) { width: 16px; height: 16px; }
+  .detail h2 { margin-top: 4px; padding-right: 20px; font-size: var(--fs-xl); letter-spacing: -0.02em; }
+  .crumb { margin-top: 3px; font-size: var(--fs-xs); color: var(--blue); }
+  .summary { margin-top: 10px; font-size: var(--fs-sm); line-height: 1.55; color: var(--ink-2); }
+  .detail .btn { margin-top: 14px; width: 100%; min-height: 38px; }
+  .detail .btn[hidden] { display: none; }
+  .neighbors-label { margin-top: 18px; font-size: 0.6875rem; }
+  .neighbors { margin-top: 4px; }
+  .neighbors :global(button) {
+    display: block;
+    width: 100%;
+    padding: 5px 0;
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    text-align: left;
+    transition: color var(--t-fast), padding-left var(--t-fast);
+  }
+  .neighbors :global(button:hover) { padding-left: 4px; color: var(--blue); }
+  .neighbors :global(button[data-type='ghost']) { color: var(--ink-3); }
+
+  /* --- Dock --- */
+  .dock {
+    position: absolute;
+    bottom: 18px;
+    left: 50%;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    max-width: calc(100% - 2 * var(--gutter));
+    padding: 5px;
+    border-radius: 14px;
+    transform: translateX(-50%);
+  }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding-inline: 10px;
+    border-radius: 9px;
+    font-size: var(--fs-xs);
+    font-weight: 500;
+    color: var(--ink-2);
+    white-space: nowrap;
+    transition: background-color var(--t-fast), color var(--t-fast);
+  }
+  .tool.icon { width: 34px; padding: 0; justify-content: center; }
+  .tool:hover { background: var(--blue-wash); color: var(--ink); }
+  .tool[aria-pressed='true'] { background: var(--blue); color: light-dark(#fff, #0c0e11); }
+  .tool :global(svg) { width: 16px; height: 16px; }
+  .sep { width: 1px; height: 20px; margin-inline: 4px; background: var(--line-2); }
+  .grow { display: flex; align-items: center; gap: 6px; }
+  .grow input {
+    width: 130px;
+    height: 16px;
+    accent-color: var(--blue);
+    cursor: pointer;
+  }
+  .grow output { width: 58px; font-size: 0.6875rem; }
+
+  .hint {
+    position: absolute;
+    right: var(--gutter);
+    bottom: 26px;
+    z-index: 1;
+    font-size: 0.625rem;
+    pointer-events: none;
+  }
+
+  /* --- Trace card --- */
+  .trace-card {
+    position: absolute;
+    bottom: 72px;
+    left: 50%;
+    z-index: 6;
+    width: min(100% - 2 * var(--gutter), 460px);
+    padding: 10px 14px;
+    border-radius: 12px;
+    transform: translateX(-50%);
+  }
+  .ends { display: flex; align-items: center; gap: 12px; }
+  .ends > span { display: grid; flex: 1; min-width: 0; }
+  .ends small { font-size: 0.625rem; }
+  .ends b {
+    overflow: hidden;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-3);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .ends b:global(.is-set) { color: var(--blue); }
+  .ends > :global(svg) { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+  .trace-result:empty { display: none; }
+  .trace-result {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-xs);
+    color: var(--ink-2);
+  }
+  .trace-result :global(em) { width: 100%; font-family: var(--font-mono); font-style: normal; font-size: 0.6875rem; color: var(--blue); }
+  .trace-result :global(span + span)::before { content: '→ '; color: var(--ink-4); }
+
+  /* --- List view --- */
+  .list {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    overflow-y: auto;
+    padding-top: calc(var(--nav-h) + 40px);
+    padding-bottom: 96px;
+    background: var(--paper);
+  }
+  .explorer:global(.is-list) .panel,
+  .explorer:global(.is-list) .detail { display: none; }
+  .list-domain + .list-domain { margin-top: 44px; }
+  .list-domain h2 { font-size: var(--fs-2xl); padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .list-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 24px 32px;
+    margin-top: 20px;
+  }
+  .list-fields h3 { margin-bottom: 6px; font-size: 0.6875rem; letter-spacing: 0.08em; }
+  .list-fields a { font-size: var(--fs-sm); color: var(--ink-2); }
+  .list-fields a:hover { color: var(--blue); }
+
+  @media (max-width: 1080px) {
+    .tool span { display: none; }
+    .tool:not(.icon) { width: 34px; padding: 0; justify-content: center; }
+    .hint { display: none; }
+  }
+  @media (max-width: 900px) {
+    .panel {
+      top: calc(var(--nav-h) + 22px);
+      left: var(--gutter);
+      right: var(--gutter);
+      width: auto;
+      max-height: calc(100dvh - var(--nav-h) - 110px);
+    }
+    summary { padding: 11px 14px; cursor: pointer; }
+    summary :global(.fold-icon) { display: block; }
+    h1 { font-size: var(--fs-md); }
+    .panel-body { padding: 0 14px 14px; }
+    .detail {
+      top: auto;
+      right: var(--gutter);
+      left: var(--gutter);
+      bottom: 68px;
+      width: auto;
+      max-height: 46dvh;
+      transform: translateY(14px);
+    }
+    .grow input { width: 76px; }
+    .grow output { display: none; }
+  }
+</style>

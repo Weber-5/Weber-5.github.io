@@ -1,0 +1,44 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { useT } from '../i18n';
+
+const en = useT('en');
+const zh = useT('zh');
+---
+
+<Base lang="en" title="404" noindex>
+  <section class="lost wrap">
+    <svg class="ring" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      <circle cx="60" cy="60" r="44" stroke="var(--ink-4)" stroke-dasharray="3 6"></circle>
+      <circle cx="60" cy="16" r="4" fill="var(--blue)"></circle>
+    </svg>
+    <p class="label">404</p>
+    <h1>{en('404.title')}</h1>
+    <p class="lead">{en('404.lead')}</p>
+    <p class="zh" lang="zh-CN">{zh('404.title')}。{zh('404.lead')}</p>
+    <div class="actions">
+      <a class="btn btn-primary" href="/">{en('404.home')}</a>
+      <a class="btn" href="/graph/">
+        <Icon name="graph" />
+        {en('404.graph')}
+      </a>
+    </div>
+  </section>
+</Base>
+
+<style>
+  .lost {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding-top: calc(var(--nav-h) + 12vh);
+    text-align: center;
+  }
+  .ring { width: 96px; animation: spin 26s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: var(--fs-2xl); }
+  .lead { max-width: 46ch; color: var(--ink-2); }
+  .zh { max-width: 46ch; font-size: var(--fs-sm); color: var(--ink-3); }
+  .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 14px; }
+</style>

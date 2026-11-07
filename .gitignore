@@ -1,8 +1,11 @@
 .DS_Store
 Thumbs.db
-db.json
 *.log
 node_modules/
-public/
-.deploy*/
-_multiconfig.yml
+dist/
+.astro/
+.env
+.env.*
+# Obsidian per-machine state (keep the notes, drop the workspace)
+content/notes/.obsidian/workspace*
+content/notes/.trash/

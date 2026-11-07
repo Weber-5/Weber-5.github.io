@@ -1,0 +1,130 @@
+---
+import { getCollection, render } from 'astro:content';
+import '../../../styles/prose.css';
+import Base from '../../../layouts/Base.astro';
+import Icon from '../../../components/Icon.astro';
+import InkCover from '../../../components/InkCover.astro';
+import { href, localeParams, tr, useT, type Lang } from '../../../i18n';
+import { getVault } from '../../../lib/vault';
+import { noteTitle } from '../../../lib/notes';
+
+export async function getStaticPaths() {
+  const projects = await getCollection('projects');
+  const zhBodies = new Map((await getCollection('projectBodiesZh')).map((b) => [b.id, b]));
+  return localeParams().flatMap(({ params, props }) =>
+    projects.map((project) => ({
+      params: { ...params, slug: project.id },
+      props: { ...props, project, zhBody: zhBodies.get(project.id) },
+    })),
+  );
+}
+
+const { project, zhBody } = Astro.props;
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const { data } = project;
+const title = tr(data.title, lang);
+const { Content } = await render(lang === 'zh' && zhBody ? zhBody : project);
+
+const vault = getVault();
+const related = data.notes.map((n) => vault.resolve(n)).filter((n) => n !== undefined);
+const links = [
+  { label: t('projects.source'), url: data.links.github, icon: 'github' },
+  { label: t('projects.demo'), url: data.links.demo, icon: 'arrow-up-right' },
+  { label: t('projects.docs'), url: data.links.docs, icon: 'doc' },
+].filter((l) => l.url) as { label: string; url: string; icon: 'github' | 'arrow-up-right' | 'doc' }[];
+---
+
+<Base lang={lang} title={title} description={tr(data.summary, lang)} type="article">
+  <article>
+    <header class="page-head wrap">
+      <a class="text-link back" href={href('/projects/', lang)} data-reveal>
+        <Icon name="arrow" />
+        {t('projects.back')}
+      </a>
+      <h1 data-reveal style="--i:1">{title}</h1>
+      <p class="lead" data-reveal style="--i:2">{tr(data.summary, lang)}</p>
+    </header>
+
+    <div class="wrap">
+      <div class="cover" data-reveal>
+        {data.cover ? <img src={data.cover} alt="" /> : <InkCover seed={project.id} />}
+      </div>
+
+      <div class="layout">
+        <aside class="meta" data-reveal>
+          <dl>
+            {data.role && <div><dt class="label">{t('projects.role')}</dt><dd>{tr(data.role, lang)}</dd></div>}
+            {data.period && <div><dt class="label">{t('projects.period')}</dt><dd>{data.period}</dd></div>}
+            {data.status && <div><dt class="label">{t('projects.status')}</dt><dd>{tr(data.status, lang)}</dd></div>}
+            {data.tags.length > 0 && (
+              <div>
+                <dt class="label">{t('projects.stack')}</dt>
+                <dd class="tags">{data.tags.map((tag) => <span class="chip">{tag}</span>)}</dd>
+              </div>
+            )}
+          </dl>
+          <div class="links">
+            {links.map((l) => (
+              <a class="btn" href={l.url} rel="noopener">
+                <Icon name={l.icon} />
+                {l.label}
+              </a>
+            ))}
+          </div>
+          {related.length > 0 && (
+            <nav aria-label={t('projects.related')}>
+              <p class="label">{t('projects.related')}</p>
+              <ul>
+                {related.map((n) => <li><a href={href(`/notes/${n.slug}/`, lang)}>{noteTitle(n, lang)}</a></li>)}
+              </ul>
+            </nav>
+          )}
+        </aside>
+        <div class="prose" lang={lang === 'zh' && zhBody ? 'zh-CN' : 'en'} data-reveal>
+          <Content />
+        </div>
+      </div>
+    </div>
+  </article>
+</Base>
+
+<style>
+  .back :global(svg) { transform: rotate(180deg); }
+  .back:hover :global(svg) { transform: rotate(180deg) translateX(3px); }
+  .back { margin-bottom: 20px; }
+  .cover {
+    aspect-ratio: 21 / 9;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+  }
+  .cover img { width: 100%; height: 100%; object-fit: cover; }
+  .layout {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 68ch);
+    justify-content: space-between;
+    gap: clamp(32px, 6vw, 80px);
+    margin-top: clamp(36px, 5vw, 64px);
+  }
+  .meta {
+    position: sticky;
+    top: calc(var(--nav-h) + 40px);
+    align-self: start;
+    display: grid;
+    gap: 22px;
+  }
+  dl { display: grid; gap: 12px; }
+  dd { font-size: var(--fs-sm); color: var(--ink-2); }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+  .links { display: flex; flex-wrap: wrap; gap: 6px; }
+  nav ul { margin-top: 6px; }
+  nav a { font-size: var(--fs-sm); color: var(--ink-2); }
+  nav a:hover { color: var(--blue); }
+  .prose :global(> :first-child) { margin-top: 0; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    .meta { position: static; }
+    .cover { aspect-ratio: 16 / 9; }
+  }
+</style>

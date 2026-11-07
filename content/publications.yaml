@@ -1,0 +1,72 @@
+# One entry per publication, any order (the site sorts by year).
+# Prefix your own name with * to emphasise it. Set selected: true for the home page.
+# Delete `placeholder: true` once an entry is real.
+
+- id: placeholder-journal
+  title: { en: Publication title goes here, zh: 论文题目占位 }
+  authors: [Author One, '*Weber', Author Three]
+  venue: { en: Journal Name, zh: 期刊名称 }
+  year: 2026
+  type: journal
+  selected: true
+  placeholder: true
+  abstract:
+    en: A short abstract of the paper goes here. It stays folded until a reader asks for it.
+    zh: 这里是论文摘要占位，默认折叠，读者需要时再展开。
+  bibtex: |-
+    @article{placeholder2026journal,
+      title   = {Publication title goes here},
+      author  = {One, Author and Weber and Three, Author},
+      journal = {Journal Name},
+      year    = {2026}
+    }
+  topics: [Topic A]
+  links: { pdf: '#', doi: '#', code: '#' }
+  notes: [Convex Optimization]
+
+- id: placeholder-conference
+  title: { en: Conference paper title goes here, zh: 会议论文题目占位 }
+  authors: ['*Weber', Author Two]
+  venue: { en: Conference Name, zh: 会议名称 }
+  year: 2026
+  type: conference
+  selected: true
+  placeholder: true
+  abstract:
+    en: A short abstract of the paper goes here.
+    zh: 这里是论文摘要占位。
+  bibtex: |-
+    @inproceedings{placeholder2026conference,
+      title     = {Conference paper title goes here},
+      author    = {Weber and Two, Author},
+      booktitle = {Conference Name},
+      year      = {2026}
+    }
+  topics: [Topic B]
+  links: { pdf: '#', slides: '#' }
+  notes: [Kalman Filter]
+
+- id: placeholder-preprint
+  title: { en: Preprint title goes here, zh: 预印本题目占位 }
+  authors: [Author One, Author Two, '*Weber']
+  venue: { en: arXiv preprint, zh: arXiv 预印本 }
+  year: 2025
+  type: preprint
+  selected: true
+  placeholder: true
+  abstract:
+    en: A short abstract of the paper goes here.
+    zh: 这里是论文摘要占位。
+  topics: [Topic A, Topic B]
+  links: { arxiv: '#', code: '#' }
+  notes: [Attention Mechanism]
+
+- id: placeholder-older
+  title: { en: Earlier publication title goes here, zh: 较早论文题目占位 }
+  authors: ['*Weber', Author Two, Author Three]
+  venue: { en: Workshop Name, zh: 研讨会名称 }
+  year: 2024
+  type: conference
+  placeholder: true
+  topics: [Topic C]
+  links: { pdf: '#' }

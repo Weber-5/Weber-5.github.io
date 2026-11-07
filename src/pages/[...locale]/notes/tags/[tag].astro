@@ -1,0 +1,43 @@
+---
+import Base from '../../../../layouts/Base.astro';
+import NoteRow from '../../../../components/NoteRow.astro';
+import { localeParams, useT, type Lang } from '../../../../i18n';
+import { getVault } from '../../../../lib/vault';
+import { buildGraph } from '../../../../lib/graph';
+
+export function getStaticPaths() {
+  const tags = [...new Set(getVault().notes.flatMap((n) => n.tags))];
+  return localeParams().flatMap(({ params, props }) =>
+    tags.map((tag) => ({ params: { ...params, tag }, props: { ...props, tag } })),
+  );
+}
+
+const { tag } = Astro.props;
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const notes = getVault().notes.filter((n) => n.tags.includes(tag));
+const { domains } = await buildGraph();
+const crumbOf = (domain: string, field?: string) => {
+  const d = domains.find((x) => x.id === domain);
+  const f = d?.fields.find((x) => x.id === field);
+  return (f ?? d)?.name[lang] ?? '';
+};
+---
+
+<Base lang={lang} title={`#${tag}`} description={`${t('notes.tag')}: ${tag}`}>
+  <header class="page-head wrap">
+    <p class="label">{t('notes.tag')}</p>
+    <h1>#{tag}</h1>
+  </header>
+  <section class="wrap">
+    <ul class="list">
+      {notes.map((note, i) => (
+        <NoteRow note={note} lang={lang} crumb={crumbOf(note.domain, note.field)} i={i} />
+      ))}
+    </ul>
+  </section>
+</Base>
+
+<style>
+  .list { border-bottom: 1px solid var(--line); }
+</style>

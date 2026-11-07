@@ -1,0 +1,69 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Icon from './Icon.astro';
+import InkCover from './InkCover.astro';
+import { href, tr, useT, type Lang } from '../i18n';
+
+interface Props {
+  project: CollectionEntry<'projects'>;
+  lang: Lang;
+  i?: number;
+  variant?: number;
+}
+
+const { project, lang, i = 0, variant } = Astro.props;
+const t = useT(lang);
+const { data, id } = project;
+const title = tr(data.title, lang);
+---
+
+<article class:list={['card', 'project']} data-reveal style={`--i:${i}`} data-project-tags={data.tags.join('|')}>
+  <div class="media">
+    {data.cover ? <img src={data.cover} alt="" loading="lazy" /> : <InkCover seed={id} variant={variant} />}
+  </div>
+  <div class="body">
+    <div class="top">
+      <h3><a class="stretch" href={href(`/projects/${id}/`, lang)}>{title}</a></h3>
+      <Icon name="arrow-up-right" class="go" />
+    </div>
+    <p>{tr(data.summary, lang)}</p>
+    <div class="tags">
+      {data.placeholder && <span class="chip chip-ph">{t('placeholder.chip')}</span>}
+      {data.tags.map((tag) => <span class="chip">{tag}</span>)}
+    </div>
+  </div>
+</article>
+
+<style>
+  .project { display: flex; flex-direction: column; overflow: hidden; }
+  .media {
+    flex: 1;
+    min-height: 200px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .media img, .media :global(svg) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 900ms var(--ease);
+  }
+  .project:hover .media img,
+  .project:hover .media :global(svg) { transform: scale(1.035); }
+  .body { display: flex; flex-direction: column; gap: 8px; padding: 20px 20px 18px; }
+  .top { display: flex; justify-content: space-between; gap: 12px; }
+  h3 { font-size: var(--fs-xl); letter-spacing: -0.02em; }
+  .stretch::after { content: ''; position: absolute; inset: 0; z-index: 1; }
+  .stretch:focus-visible { outline: none; }
+  .stretch:focus-visible::after { outline: 2px solid var(--blue); outline-offset: -2px; border-radius: var(--radius); }
+  .top :global(.go) {
+    width: 18px;
+    height: 18px;
+    color: var(--ink-3);
+    transition: transform var(--t-med) var(--ease), color var(--t-med);
+  }
+  .project:hover .top :global(.go) { transform: translate(2px, -2px); color: var(--blue); }
+  p { flex: 1; font-size: var(--fs-sm); color: var(--ink-2); }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+
+</style>

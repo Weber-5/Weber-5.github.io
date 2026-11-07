@@ -1,0 +1,90 @@
+---
+import { formatDate, href, useT, type Lang, type UiKey } from '../i18n';
+import { noteSummary, noteTitle } from '../lib/notes';
+import type { VaultNote } from '../lib/vault';
+
+interface Props {
+  note: VaultNote;
+  lang: Lang;
+  crumb: string;
+  i?: number;
+}
+
+const { note, lang, crumb, i = 0 } = Astro.props;
+const t = useT(lang);
+const title = noteTitle(note, lang);
+---
+
+<li
+  class="row"
+  data-reveal
+  style={`--i:${Math.min(i, 8)}`}
+  data-note-domain={note.domain}
+  data-note-field={note.field}
+  data-note-text={`${note.title} ${note.titleZh ?? ''} ${note.tags.join(' ')} ${note.aliases.join(' ')}`.toLowerCase()}
+>
+  <a href={href(`/notes/${note.slug}/`, lang)}>
+    <time class="label" datetime={note.created}>{formatDate(note.created, lang)}</time>
+    <span class="main">
+      <span class="title">{title}</span>
+      <span class="summary">{noteSummary(note, lang)}</span>
+    </span>
+    <span class="side">
+      <span class="crumb">{crumb}</span>
+      <span class="status" data-status={note.status}>{t(`status.${note.status}` as UiKey)}</span>
+    </span>
+  </a>
+</li>
+
+<style>
+  .row { border-top: 1px solid var(--line); }
+  a {
+    display: grid;
+    grid-template-columns: 110px 1fr auto;
+    align-items: baseline;
+    gap: 6px 24px;
+    padding: 16px 0;
+    transition: padding-left var(--t-med) var(--ease);
+  }
+  @media (hover: hover) {
+    a:hover { padding-left: 8px; }
+    a:hover .title { color: var(--blue); }
+  }
+  time { font-size: 0.6875rem; }
+  .main { display: grid; gap: 2px; min-width: 0; }
+  .title {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--fs-lg);
+    letter-spacing: -0.012em;
+    transition: color var(--t-fast);
+  }
+  .summary {
+    overflow: hidden;
+    font-size: var(--fs-sm);
+    color: var(--ink-3);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .side { display: flex; align-items: center; gap: 12px; font-size: var(--fs-xs); color: var(--ink-3); }
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+  }
+  .status::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border: 1px solid var(--ink-3);
+    border-radius: 50%;
+  }
+  .status[data-status='growing']::before { background: linear-gradient(90deg, var(--ink-3) 50%, transparent 50%); }
+  .status[data-status='evergreen']::before { background: var(--blue); border-color: var(--blue); }
+  @media (max-width: 720px) {
+    a { grid-template-columns: 1fr; }
+    .side { order: 3; }
+  }
+</style>

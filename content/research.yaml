@@ -1,0 +1,43 @@
+# The Research page. Publications live in publications.yaml.
+
+intro:
+  en: Placeholder overview of your research program, in two or three sentences.
+  zh: 这里是研究方向总览占位，用两三句话概括你的研究脉络。
+
+directions:
+  - title: { en: Research Direction One, zh: 研究方向一 }
+    summary:
+      en: Two sentences on the question this direction asks and why the answer matters.
+      zh: 用两句话说明这个方向要回答的问题，以及答案为什么重要。
+    keywords: [Keyword, Keyword, Keyword]
+    placeholder: true
+  - title: { en: Research Direction Two, zh: 研究方向二 }
+    summary:
+      en: Two sentences on the question this direction asks and why the answer matters.
+      zh: 用两句话说明这个方向要回答的问题，以及答案为什么重要。
+    keywords: [Keyword, Keyword]
+    placeholder: true
+  - title: { en: Research Direction Three, zh: 研究方向三 }
+    summary:
+      en: Two sentences on the question this direction asks and why the answer matters.
+      zh: 用两句话说明这个方向要回答的问题，以及答案为什么重要。
+    keywords: [Keyword, Keyword, Keyword]
+    placeholder: true
+
+experience:
+  - title: { en: Research position, zh: 科研职位 }
+    org: { en: Laboratory or group name, zh: 实验室或课题组名称 }
+    place: { en: Institution, zh: 所在机构 }
+    period: 20XX – Present
+    detail:
+      en: One sentence on what you worked on and what came out of it.
+      zh: 用一句话说明你做了什么，以及产出了什么。
+    placeholder: true
+  - title: { en: Research position, zh: 科研职位 }
+    org: { en: Laboratory or group name, zh: 实验室或课题组名称 }
+    place: { en: Institution, zh: 所在机构 }
+    period: 20XX – 20XX
+    detail:
+      en: One sentence on what you worked on and what came out of it.
+      zh: 用一句话说明你做了什么，以及产出了什么。
+    placeholder: true

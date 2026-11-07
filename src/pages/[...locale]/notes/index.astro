@@ -1,0 +1,149 @@
+---
+import Base from '../../../layouts/Base.astro';
+import NoteRow from '../../../components/NoteRow.astro';
+import Icon from '../../../components/Icon.astro';
+import { localeParams, useT, type Lang } from '../../../i18n';
+import { getVault } from '../../../lib/vault';
+import { buildGraph } from '../../../lib/graph';
+
+export const getStaticPaths = localeParams;
+
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const notes = getVault().notes;
+const { domains } = await buildGraph();
+
+const crumbOf = (domain: string, field?: string) => {
+  const d = domains.find((x) => x.id === domain);
+  const f = d?.fields.find((x) => x.id === field);
+  return (f ?? d)?.name[lang] ?? '';
+};
+const count = (domain: string) => notes.filter((n) => n.domain === domain).length;
+---
+
+<Base lang={lang} title={t('notes.title')} description={t('notes.lead')}>
+  <header class="page-head wrap">
+    <h1 data-reveal>{t('notes.title')}</h1>
+    <p class="lead" data-reveal style="--i:1">{t('notes.lead')}</p>
+  </header>
+
+  <section class="wrap" data-note-index>
+    <div class="controls" data-reveal>
+      <div class="search">
+        <Icon name="search" />
+        <input type="search" data-note-search placeholder={t('notes.filter')} aria-label={t('notes.filter')} />
+      </div>
+      <div class="filters" role="group" aria-label={t('graph.domains')}>
+        <button class="filter" type="button" data-domain-filter="" aria-pressed="true">{t('notes.all')}</button>
+        {domains.map((d) => (
+          <button class="filter" type="button" data-domain-filter={d.id} aria-pressed="false">
+            {d.name[lang]} <span class="n">{count(d.id)}</span>
+          </button>
+        ))}
+      </div>
+      {domains.map((d) => (
+        <div class="fields" role="group" aria-label={d.name[lang]} data-fields-of={d.id} hidden>
+          {d.fields.map((f) => (
+            <button class="chip field" type="button" data-field-filter={f.id} aria-pressed="false">{f.name[lang]}</button>
+          ))}
+        </div>
+      ))}
+    </div>
+
+    <p class="label count" aria-live="polite"><span data-note-count>{notes.length}</span> {t('notes.count')}</p>
+    <ul class="list">
+      {notes.map((note, i) => (
+        <NoteRow note={note} lang={lang} crumb={crumbOf(note.domain, note.field)} i={i} />
+      ))}
+    </ul>
+    <p class="empty" data-note-empty hidden>{t('notes.empty')}</p>
+  </section>
+</Base>
+
+<script>
+  const root = document.querySelector<HTMLElement>('[data-note-index]')!;
+  const rows = [...root.querySelectorAll<HTMLElement>('[data-note-text]')];
+  const input = root.querySelector<HTMLInputElement>('[data-note-search]')!;
+  const counter = root.querySelector<HTMLElement>('[data-note-count]')!;
+  const empty = root.querySelector<HTMLElement>('[data-note-empty]')!;
+  const domainButtons = root.querySelectorAll<HTMLButtonElement>('[data-domain-filter]');
+  const fieldButtons = root.querySelectorAll<HTMLButtonElement>('[data-field-filter]');
+  const fieldGroups = root.querySelectorAll<HTMLElement>('[data-fields-of]');
+  let domain = '';
+  let field = '';
+
+  function apply() {
+    const q = input.value.trim().toLowerCase();
+    let shown = 0;
+    for (const row of rows) {
+      const hit =
+        (!domain || row.dataset.noteDomain === domain) &&
+        (!field || row.dataset.noteField === field) &&
+        (!q || row.dataset.noteText!.includes(q));
+      row.hidden = !hit;
+      if (hit) {
+        shown++;
+        row.classList.add('is-in');
+      }
+    }
+    counter.textContent = String(shown);
+    empty.hidden = shown > 0;
+  }
+
+  input.addEventListener('input', apply);
+  domainButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      domain = button.dataset.domainFilter!;
+      field = '';
+      domainButtons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+      fieldButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      fieldGroups.forEach((g) => (g.hidden = g.dataset.fieldsOf !== domain));
+      apply();
+    });
+  });
+  fieldButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const next = button.dataset.fieldFilter!;
+      field = field === next ? '' : next;
+      fieldButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fieldFilter === field)));
+      apply();
+    });
+  });
+</script>
+
+<style>
+  .controls { display: grid; gap: 12px; margin-bottom: 26px; }
+  .search { position: relative; max-width: 420px; }
+  .search :global(svg) {
+    position: absolute;
+    top: 12px;
+    left: 13px;
+    width: 16px;
+    height: 16px;
+    color: var(--ink-3);
+    pointer-events: none;
+  }
+  .search input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px 0 38px;
+    border: 1px solid var(--line-2);
+    border-radius: 10px;
+    outline: none;
+    background: var(--surface);
+    font-size: var(--fs-sm);
+    transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  }
+  .search input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-wash); }
+  .filters, .fields { display: flex; flex-wrap: wrap; gap: 6px; }
+  .fields[hidden] { display: none; }
+  .n { font-family: var(--font-mono); font-size: 0.6875rem; opacity: 0.6; }
+  .field { cursor: pointer; transition: all var(--t-fast); }
+  .field:hover { color: var(--blue); border-color: var(--blue); }
+  .field[aria-pressed='true'] { background: var(--blue); border-color: var(--blue); color: light-dark(#fff, #0c0e11); }
+  .count { margin-bottom: 10px; font-size: 0.6875rem; }
+  .list { border-bottom: 1px solid var(--line); }
+  .list :global([hidden]) { display: none; }
+  .empty { padding: 48px 0; color: var(--ink-3); text-align: center; }
+  .empty[hidden] { display: none; }
+</style>

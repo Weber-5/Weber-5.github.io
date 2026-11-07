@@ -1,0 +1,50 @@
+# Identity and home-page copy. Any text field takes either a plain string or
+# { en: ..., zh: ... } for two languages. Empty links show as "To be added".
+
+name:
+  en: Weber
+  zh: Weber
+role:
+  en: Researcher & Engineer
+  zh: 研究者 · 工程师
+affiliation:
+  en: EECS, Huazhong University of Science and Technology
+  zh: 华中科技大学 EECS
+location:
+  en: Wuhan, China
+  zh: 中国 · 武汉
+coordinates: 30.51°N 114.41°E
+
+tagline:
+  en: One sentence that says what you work on and why it matters.
+  zh: 用一句话说明你在研究什么，以及它为什么重要。
+intro:
+  en: >-
+    Placeholder introduction. Two or three sentences go here: your current position,
+    the problems you care about, and what you are looking for next.
+  zh: >-
+    这里是个人简介占位。用两三句话说明你目前的身份、关注的问题，以及接下来希望做的事情。
+
+# Put a photo in public/images/ and set e.g. /images/portrait.jpg
+portrait: ''
+
+links:
+  github: https://github.com/Weber-5
+  scholar: ''
+  email: ''
+  orcid: ''
+  linkedin: ''
+
+interests:
+  - title: { en: Research Interest One, zh: 研究兴趣一 }
+    note: { en: A short phrase describing this interest., zh: 用一句短语描述这个方向。 }
+  - title: { en: Research Interest Two, zh: 研究兴趣二 }
+    note: { en: A short phrase describing this interest., zh: 用一句短语描述这个方向。 }
+  - title: { en: Research Interest Three, zh: 研究兴趣三 }
+    note: { en: A short phrase describing this interest., zh: 用一句短语描述这个方向。 }
+  - title: { en: Research Interest Four, zh: 研究兴趣四 }
+    note: { en: A short phrase describing this interest., zh: 用一句短语描述这个方向。 }
+
+philosophy:
+  en: A short statement of how you approach research, the belief that shapes which problems you choose and how you work on them.
+  zh: 用一小段话写下你做研究的方式，以及决定你选择什么问题、如何推进它们的那个信念。

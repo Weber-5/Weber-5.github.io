@@ -1,0 +1,119 @@
+---
+import { rng, ridge, areaPath, linePath } from '../lib/ink';
+
+interface Props {
+  src?: string;
+  alt: string;
+  caption: string;
+  coordinates?: string;
+}
+
+const { src, alt, caption, coordinates } = Astro.props;
+
+/*
+ * With no photo set, the arch frames an ink landscape instead: ranges deepening
+ * toward the viewer with mist between them, and one dab of blue for the moon.
+ */
+const rand = rng('moon-gate-3');
+const ranges = [
+  { base: 268, amp: 30, tone: 0.2, line: 0.16 },
+  { base: 318, amp: 36, tone: 0.34, line: 0.24 },
+  { base: 372, amp: 40, tone: 0.52, line: 0.34 },
+  { base: 428, amp: 40, tone: 0.76, line: 0.5 },
+  { base: 482, amp: 34, tone: 1, line: 0.7 },
+].map((r) => ({ ...r, points: ridge(rand, { width: 400, base: r.base, amp: r.amp, steps: 84, octaves: 5, sharp: true }) }));
+---
+
+<figure class="portrait">
+  <div class="stage">
+    <div class="gate">
+      {src ? (
+        <img src={src} alt={alt} width="800" height="1000" fetchpriority="high" />
+      ) : (
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" role="img" aria-label={caption}>
+          <defs>
+            <linearGradient id="p-wash" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--ink)" stop-opacity="0.62"></stop>
+              <stop offset="0.3" stop-color="var(--ink)" stop-opacity="0.2"></stop>
+              <stop offset="0.72" stop-color="var(--ink)" stop-opacity="0"></stop>
+            </linearGradient>
+            <radialGradient id="p-moon">
+              <stop offset="0" stop-color="var(--blue)" stop-opacity="0.92"></stop>
+              <stop offset="0.5" stop-color="var(--blue)" stop-opacity="0.72"></stop>
+              <stop offset="0.72" stop-color="var(--blue)" stop-opacity="0.2"></stop>
+              <stop offset="1" stop-color="var(--blue)" stop-opacity="0"></stop>
+            </radialGradient>
+            <filter id="p-bleed" x="-30%" y="-30%" width="160%" height="160%">
+              <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="8"></feTurbulence>
+              <feDisplacementMap in="SourceGraphic" scale="11"></feDisplacementMap>
+            </filter>
+          </defs>
+          <circle cx="262" cy="150" r="66" fill="url(#p-moon)" filter="url(#p-bleed)"></circle>
+          {ranges.map((r) => (
+            <g>
+              <path d={areaPath(r.points, 500)} fill="var(--surface-2)" opacity={0.55}></path>
+              <path d={areaPath(r.points, 500)} fill="url(#p-wash)" opacity={r.tone}></path>
+              <path d={linePath(r.points)} fill="none" stroke="var(--ink)" stroke-opacity={r.line} stroke-width="0.9"></path>
+            </g>
+          ))}
+        </svg>
+      )}
+    </div>
+    <svg class="frame" viewBox="0 0 400 500" fill="none" aria-hidden="true">
+      <path d="M-10 500V200a210 210 0 0 1 420 0v300" stroke="var(--line-2)" vector-effect="non-scaling-stroke"></path>
+      <path d="M-30 500h20M410 500h20" stroke="var(--ink-4)" vector-effect="non-scaling-stroke"></path>
+    </svg>
+    {src && <span class="dab" aria-hidden="true"></span>}
+  </div>
+  <figcaption class="label">
+    <span>{caption}</span>
+    {coordinates && <span>{coordinates}</span>}
+  </figcaption>
+</figure>
+
+<style>
+  .portrait {
+    position: relative;
+    width: min(100%, 372px);
+    margin-inline: auto;
+    animation: gate-in 1.3s var(--ease) 0.2s both;
+  }
+  @keyframes gate-in {
+    from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+  }
+  .stage { position: relative; }
+  .gate {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: 999px 999px 3px 3px;
+    background: linear-gradient(var(--surface), var(--paper-2));
+    box-shadow: inset 0 0 0 1px var(--line), var(--shadow-3);
+  }
+  .gate img, .gate svg { width: 100%; height: 100%; object-fit: cover; }
+  .frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+  .dab {
+    position: absolute;
+    top: 7%;
+    right: -2%;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    background: var(--blue);
+    box-shadow: 0 0 0 6px var(--blue-wash), 0 0 26px 6px var(--blue-glow);
+  }
+  figcaption {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 0.6875rem;
+  }
+</style>

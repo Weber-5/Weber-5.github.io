@@ -1,0 +1,133 @@
+---
+import Icon from './Icon.astro';
+import { useT, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useT(lang);
+const labels = {
+  page: t('palette.page'),
+  note: t('palette.note'),
+  paper: t('palette.paper'),
+  project: t('palette.project'),
+  empty: t('palette.empty'),
+};
+---
+
+<dialog class="palette" data-palette data-lang={lang} data-labels={JSON.stringify(labels)} aria-label={t('a11y.search')}>
+  <div class="field">
+    <Icon name="search" />
+    <input
+      type="search"
+      data-palette-input
+      placeholder={t('palette.placeholder')}
+      aria-label={t('palette.placeholder')}
+      aria-controls="palette-results"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <kbd>Esc</kbd>
+  </div>
+  <ul class="results" id="palette-results" data-palette-results role="listbox" aria-label={t('a11y.search')}></ul>
+  <p class="hints">
+    <span><kbd>↑</kbd><kbd>↓</kbd> {t('palette.hint.nav')}</span>
+    <span><kbd>↵</kbd> {t('palette.hint.open')}</span>
+    <span><kbd>Esc</kbd> {t('palette.hint.close')}</span>
+  </p>
+</dialog>
+
+<style is:global>
+  .palette {
+    position: fixed;
+    top: min(16vh, 140px);
+    left: 50%;
+    width: min(100% - 2 * var(--gutter), 620px);
+    max-height: min(68vh, 560px);
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    transform: translateX(-50%);
+    border: 1px solid var(--line-2);
+    border-radius: 16px;
+    color: var(--ink);
+    background: var(--glass-strong);
+    backdrop-filter: blur(24px) saturate(1.5);
+    box-shadow: var(--shadow-3);
+  }
+  .palette[open] { display: flex; flex-direction: column; animation: palette-in 240ms var(--ease); }
+  .palette::backdrop {
+    background: light-dark(rgb(17 20 26 / 0.22), rgb(0 0 0 / 0.5));
+    backdrop-filter: blur(2px);
+    animation: fade-in 200ms var(--ease);
+  }
+  @keyframes palette-in { from { opacity: 0; transform: translate(-50%, -6px) scale(0.985); } }
+  @keyframes fade-in { from { opacity: 0; } }
+
+  .palette .field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .palette .field svg { width: 18px; height: 18px; color: var(--ink-3); flex: none; }
+  .palette input {
+    flex: 1;
+    min-width: 0;
+    height: 48px;
+    border: 0;
+    outline: 0;
+    background: none;
+    font-size: var(--fs-md);
+  }
+  .palette input::-webkit-search-cancel-button { display: none; }
+  .palette input::placeholder { color: var(--ink-3); }
+  .palette kbd {
+    padding: 1px 5px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--ink-3);
+  }
+  .palette .results { flex: 1; overflow-y: auto; padding: 6px; }
+  .palette .results:empty { display: none; }
+  .palette .result {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 2px 14px;
+    padding: 9px 10px;
+    border-radius: 9px;
+    cursor: pointer;
+  }
+  .palette .result[aria-selected='true'] { background: var(--blue-wash); }
+  .palette .result strong { font-weight: 500; font-size: var(--fs-sm); }
+  .palette .result[aria-selected='true'] strong { color: var(--blue); }
+  .palette .result small {
+    grid-column: 1;
+    overflow: hidden;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .palette .result .kind { grid-column: 2; grid-row: 1 / span 2; }
+  .palette .none { padding: 26px; text-align: center; font-size: var(--fs-sm); color: var(--ink-3); }
+  .palette .hints {
+    display: flex;
+    gap: 16px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--line);
+    font-size: 0.6875rem;
+    color: var(--ink-3);
+  }
+  .palette .hints span { display: inline-flex; align-items: center; gap: 4px; }
+  @media (max-width: 640px) {
+    .palette { top: 76px; }
+    .palette .hints { display: none; }
+  }
+</style>

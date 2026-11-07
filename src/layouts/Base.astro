@@ -1,0 +1,128 @@
+---
+import '@fontsource-variable/manrope';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/global.css';
+import manropeUrl from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?url';
+import interUrl from '@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import CommandPalette from '../components/CommandPalette.astro';
+import { basePath, href, tr, useT, type Lang } from '../i18n';
+import { getProfile } from '../lib/data';
+
+interface Props {
+  lang: Lang;
+  title?: string;
+  description?: string;
+  image?: string;
+  type?: 'website' | 'article' | 'profile';
+  noindex?: boolean;
+  jsonLd?: object;
+  /** Full-bleed tool pages (the graph) drop the footer. */
+  bare?: boolean;
+}
+
+const { lang, title, description, image = '/og.png', type = 'website', noindex, jsonLd, bare } = Astro.props;
+const profile = getProfile();
+const t = useT(lang);
+const name = tr(profile.name, lang);
+const fullTitle = title ? `${title} · ${name}` : `${name} · ${t('home.title')}`;
+const desc = description || tr(profile.tagline, lang);
+
+const site = Astro.site!;
+const path = basePath(Astro.url.pathname);
+const canonical = new URL(href(path, lang), site).href;
+const alternate = (l: Lang) => new URL(href(path, l), site).href;
+const ogImage = new URL(image, site).href;
+---
+
+<!doctype html>
+<html lang={lang === 'zh' ? 'zh-CN' : 'en'} data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={desc} />
+    <meta name="author" content={name} />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f6f7f8" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0e11" />
+    {noindex && <meta name="robots" content="noindex" />}
+
+    <link rel="canonical" href={canonical} />
+    {!noindex && (
+      <>
+        <link rel="alternate" hreflang="en" href={alternate('en')} />
+        <link rel="alternate" hreflang="zh-CN" href={alternate('zh')} />
+        <link rel="alternate" hreflang="x-default" href={alternate('en')} />
+      </>
+    )}
+    <link rel="alternate" type="application/rss+xml" title={`${name} · Notes`} href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <meta property="og:type" content={type} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:site_name" content={name} />
+    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preload" href={manropeUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
+
+    {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
+
+    <!-- Must come before the script below: its matchMedia call forces a style pass,
+         and a page with no @view-transition rule at that moment cancels the transition. -->
+    <style is:inline>@view-transition { navigation: auto; }</style>
+
+    <!-- Runs before first paint: picks the theme and the language, with no flash. -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        var theme = null;
+        var lang = null;
+        try {
+          theme = localStorage.getItem('theme');
+          lang = localStorage.getItem('lang');
+        } catch (e) {}
+        root.dataset.theme = theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        root.classList.add('js');
+
+        // GitHub Pages has no server to read a visitor's address, and an IP lookup
+        // would hand every visitor to a third party. The device time zone gives the
+        // same region answer instantly, with no network request.
+        // An explicit choice always wins, and ?lang= pins a page for tooling.
+        var path = location.pathname;
+        if (/^\/zh(\/|$)/.test(path) || /[?&]lang=/.test(location.search)) return;
+        var zh = lang === 'zh';
+        if (!lang) {
+          var zone = '';
+          try {
+            zone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+          } catch (e) {}
+          zh = zone
+            ? /^Asia\/(Shanghai|Chongqing|Chungking|Harbin|Urumqi|Kashgar|Hong_Kong|Macau|Taipei)$|^PRC$/.test(zone)
+            : /^zh/i.test(navigator.language || '');
+        }
+        if (zh) location.replace('/zh' + path + location.search + location.hash);
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">{t('a11y.skip')}</a>
+    <Nav lang={lang} />
+    <main id="main">
+      <slot />
+    </main>
+    {!bare && <Footer lang={lang} />}
+    <CommandPalette lang={lang} />
+    <script>
+      import '../scripts/site';
+    </script>
+  </body>
+</html>

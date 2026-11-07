@@ -1,0 +1,241 @@
+---
+import Icon from './Icon.astro';
+import { href, basePath, useT, tr, type Lang } from '../i18n';
+import { getProfile } from '../lib/data';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useT(lang);
+const name = tr(getProfile().name, lang);
+const path = basePath(Astro.url.pathname);
+const other: Lang = lang === 'en' ? 'zh' : 'en';
+const switchTo = path.startsWith('/404') ? '/' : path;
+
+const items = [
+  { path: '/research/', label: t('nav.research') },
+  { path: '/projects/', label: t('nav.projects') },
+  { path: '/graph/', label: t('nav.graph') },
+  { path: '/notes/', label: t('nav.notes') },
+  { path: '/cv/', label: t('nav.cv') },
+];
+const isActive = (p: string) => path.startsWith(p);
+---
+
+<header class="nav" data-nav>
+  <div class="bar">
+    <a class="brand" href={href('/', lang)} aria-label={`${name}, ${t('nav.home')}`}>
+      <svg class="mark" viewBox="0 0 28 20" fill="none" aria-hidden="true">
+        <path d="M1.5 3 7 16.5 12.5 7 18 16.5 22.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        <circle cx="25" cy="3.5" r="2.2" fill="var(--blue)"></circle>
+      </svg>
+      <span>{name}</span>
+    </a>
+
+    <nav class="links" aria-label={t('nav.primary')}>
+      <ul>
+        {items.map((item) => (
+          <li>
+            <a href={href(item.path, lang)} aria-current={isActive(item.path) ? 'page' : undefined}>
+              {isActive(item.path) && <span class="pill" aria-hidden="true"></span>}
+              <span class="txt">{item.label}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+
+    <div class="tools">
+      <button class="tool search" type="button" data-palette-open aria-label={t('a11y.search')}>
+        <Icon name="search" />
+        <kbd>/</kbd>
+      </button>
+      <a
+        class="tool lang"
+        href={href(switchTo, other)}
+        hreflang={other === 'zh' ? 'zh-CN' : 'en'}
+        data-lang-switch={other}
+        lang={other === 'zh' ? 'zh-CN' : 'en'}
+        title={t('a11y.langLabel')}
+      >{t('a11y.lang')}</a>
+      <button class="tool" type="button" data-theme-toggle aria-label={t('a11y.theme')}>
+        <Icon name="sun" class="i-sun" />
+        <Icon name="moon" class="i-moon" />
+      </button>
+      <button class="tool burger" type="button" data-menu-toggle aria-expanded="false" aria-controls="nav-sheet" aria-label={t('nav.menu')}>
+        <Icon name="menu" class="i-open" />
+        <Icon name="close" class="i-close" />
+      </button>
+    </div>
+  </div>
+
+  <div class="sheet" id="nav-sheet">
+    <ul>
+      <li><a href={href('/', lang)}>{t('nav.home')}</a></li>
+      {items.map((item, i) => (
+        <li style={`--i:${i + 1}`}>
+          <a href={href(item.path, lang)} aria-current={isActive(item.path) ? 'page' : undefined}>{item.label}</a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</header>
+
+<style>
+  .nav {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    z-index: 100;
+    width: min(100% - 2 * var(--gutter), var(--max));
+    transform: translateX(-50%);
+    border: 1px solid transparent;
+    border-radius: 18px;
+    view-transition-name: site-nav;
+    transition:
+      width var(--t-med) var(--ease),
+      top var(--t-med) var(--ease),
+      background-color var(--t-med) var(--ease),
+      border-color var(--t-med) var(--ease),
+      box-shadow var(--t-med) var(--ease);
+  }
+  /* Blur lives on a pseudo-element so the sheet can sit inside the same frame. */
+  .nav::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    backdrop-filter: blur(0px) saturate(1);
+    transition: backdrop-filter var(--t-med) var(--ease);
+  }
+  .nav:global(.is-scrolled),
+  .nav:global(.is-open) {
+    top: 10px;
+    width: min(100% - 2 * var(--gutter), 860px);
+    border-color: var(--line);
+    background: var(--glass);
+    box-shadow: var(--shadow-2);
+  }
+  .nav:global(.is-scrolled)::before,
+  .nav:global(.is-open)::before { backdrop-filter: blur(18px) saturate(1.5); }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    height: var(--nav-h);
+    transition: padding var(--t-med) var(--ease);
+  }
+  .nav:global(.is-scrolled) .bar,
+  .nav:global(.is-open) .bar { padding-inline: 10px 8px; }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 0.975rem;
+    letter-spacing: -0.015em;
+  }
+  .mark { width: 26px; height: 18px; color: var(--ink); }
+  .mark circle { transition: transform var(--t-med) var(--ease); transform-origin: 25px 3.5px; }
+  .brand:hover .mark circle { transform: scale(1.35); }
+
+  .links ul { display: flex; gap: 2px; }
+  .links a {
+    position: relative;
+    display: block;
+    padding: 7px 14px;
+    border-radius: 10px;
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--ink-2);
+    transition: color var(--t-fast) var(--ease);
+  }
+  .links a:hover,
+  .links a[aria-current='page'] { color: var(--ink); }
+  .txt { position: relative; }
+  .pill {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: light-dark(rgb(17 20 26 / 0.06), rgb(236 238 241 / 0.09));
+    view-transition-name: nav-pill;
+  }
+
+  .tools { display: flex; align-items: center; gap: 2px; }
+  .tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    min-width: 36px;
+    height: 36px;
+    padding-inline: 8px;
+    border-radius: 10px;
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--ink-2);
+    transition: color var(--t-fast), background-color var(--t-fast);
+  }
+  .tool:hover { color: var(--ink); background: light-dark(rgb(17 20 26 / 0.06), rgb(236 238 241 / 0.09)); }
+  .tool :global(svg) { width: 17px; height: 17px; }
+  .tool kbd {
+    padding: 0 5px;
+    border: 1px solid var(--line-2);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    line-height: 1.5;
+    color: var(--ink-3);
+  }
+  .lang { font-family: var(--font-body); }
+
+  :global(html[data-theme='light']) .tool :global(.i-moon),
+  :global(html[data-theme='dark']) .tool :global(.i-sun) { display: none; }
+
+  .burger { display: none; }
+  .burger :global(.i-close) { display: none; }
+  .nav:global(.is-open) .burger :global(.i-open) { display: none; }
+  .nav:global(.is-open) .burger :global(.i-close) { display: block; }
+
+  .sheet {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition: grid-template-rows var(--t-med) var(--ease), visibility var(--t-med);
+  }
+  .sheet ul { overflow: hidden; min-height: 0; padding-inline: 8px; }
+  .nav:global(.is-open) .sheet { grid-template-rows: 1fr; visibility: visible; }
+  .nav:global(.is-open) .sheet ul { padding-bottom: 10px; }
+  .sheet a {
+    display: block;
+    padding: 11px 10px;
+    border-top: 1px solid var(--line);
+    font-family: var(--font-display);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .sheet a[aria-current='page'] { color: var(--blue); }
+
+  @media (max-width: 820px) {
+    .links { display: none; }
+    .burger { display: inline-flex; }
+    .search kbd { display: none; }
+    .nav:global(.is-scrolled),
+    .nav:global(.is-open) { width: min(100% - 2 * var(--gutter), var(--max)); }
+    .nav { border-color: var(--line); background: var(--glass); }
+    .bar { padding-inline: 10px 8px; }
+    .nav::before { backdrop-filter: blur(18px) saturate(1.5); }
+  }
+  @media (min-width: 821px) {
+    .sheet { display: none; }
+  }
+</style>

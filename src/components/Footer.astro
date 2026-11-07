@@ -1,0 +1,108 @@
+---
+import Icon from './Icon.astro';
+import { href, useT, tr, formatDate, type Lang } from '../i18n';
+import { getProfile } from '../lib/data';
+import { rng, ridge, linePath } from '../lib/ink';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+const t = useT(lang);
+const profile = getProfile();
+const name = tr(profile.name, lang);
+
+const rand = rng('footer');
+const lines = [0, 1, 2].map((i) =>
+  linePath(ridge(rand, { width: 1400, base: 42 + i * 8, amp: 16 - i * 4, steps: 90 })),
+);
+
+const site = [
+  { path: '/research/', label: t('nav.research') },
+  { path: '/projects/', label: t('nav.projects') },
+  { path: '/graph/', label: t('nav.graph') },
+  { path: '/notes/', label: t('nav.notes') },
+  { path: '/cv/', label: t('nav.cv') },
+];
+const elsewhere = [
+  { url: profile.links.github, label: 'GitHub' },
+  { url: profile.links.scholar, label: 'Google Scholar' },
+  { url: profile.links.orcid, label: 'ORCID' },
+  { url: profile.links.linkedin, label: 'LinkedIn' },
+].filter((l) => l.url);
+const built = new Date().toISOString().slice(0, 10);
+---
+
+<footer class="footer">
+  <svg class="ridge" viewBox="0 0 1400 80" preserveAspectRatio="none" fill="none" aria-hidden="true">
+    {lines.map((d, i) => (
+      <path d={d} stroke={i === 1 ? 'var(--blue)' : 'var(--ink-4)'} stroke-opacity={i === 1 ? 0.7 : 0.5} vector-effect="non-scaling-stroke"></path>
+    ))}
+  </svg>
+  <div class="wrap grid">
+    <div class="id">
+      <p class="name">{name}</p>
+      <p class="role">{tr(profile.role, lang)}</p>
+      <p class="role">{tr(profile.affiliation, lang)}</p>
+    </div>
+    <nav aria-label={t('footer.site')}>
+      <p class="label">{t('footer.site')}</p>
+      <ul>
+        {site.map((l) => <li><a href={href(l.path, lang)}>{l.label}</a></li>)}
+      </ul>
+    </nav>
+    <nav aria-label={t('footer.elsewhere')}>
+      <p class="label">{t('footer.elsewhere')}</p>
+      <ul>
+        {elsewhere.map((l) => <li><a href={l.url} rel="me noopener">{l.label}</a></li>)}
+        <li><a href="/rss.xml">RSS</a></li>
+      </ul>
+    </nav>
+  </div>
+  <div class="wrap base">
+    <p>© {new Date().getFullYear()} {name}. {t('footer.colophon')}</p>
+    <p class="label">{t('footer.updated')} {formatDate(built, lang)}</p>
+  </div>
+</footer>
+
+<style>
+  .footer { margin-top: clamp(32px, 4vw, 56px); padding-bottom: 28px; }
+  .ridge { width: 100%; height: 80px; margin-bottom: 44px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap: 40px;
+    padding-bottom: 44px;
+  }
+  .name {
+    font-family: var(--font-display);
+    font-size: var(--fs-xl);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .role { font-size: var(--fs-sm); color: var(--ink-3); }
+  nav .label { margin-bottom: 12px; }
+  li + li { margin-top: 6px; }
+  li a {
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    transition: color var(--t-fast);
+  }
+  li a:hover { color: var(--blue); }
+  .base {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 8px 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+  }
+  .base .label { font-size: 0.6875rem; }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .id { grid-column: 1 / -1; }
+  }
+</style>

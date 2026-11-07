@@ -1,2 +1,3 @@
 allowBuilds:
-  hexo-util: true
+  esbuild: true
+  sharp: true

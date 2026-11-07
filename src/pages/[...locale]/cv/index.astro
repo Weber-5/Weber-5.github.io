@@ -1,0 +1,240 @@
+---
+import Base from '../../../layouts/Base.astro';
+import Icon from '../../../components/Icon.astro';
+import Timeline from '../../../components/Timeline.astro';
+import { localeParams, tr, useT, type Lang } from '../../../i18n';
+import { authorsHtml, getCv, getProfile, getPublications } from '../../../lib/data';
+
+export const getStaticPaths = localeParams;
+
+const lang = Astro.props.lang as Lang;
+const t = useT(lang);
+const profile = getProfile();
+const cv = getCv();
+const papers = getPublications();
+const name = tr(profile.name, lang);
+const pdf = cv.pdf || `/cv-${lang}.pdf`;
+
+const contacts = [
+  { label: t('link.email'), value: profile.links.email, url: profile.links.email && `mailto:${profile.links.email}` },
+  { label: 'GitHub', value: profile.links.github.replace('https://', ''), url: profile.links.github },
+  { label: 'Scholar', value: profile.links.scholar && 'Google Scholar', url: profile.links.scholar },
+  { label: 'ORCID', value: profile.links.orcid.replace('https://orcid.org/', ''), url: profile.links.orcid },
+];
+
+const sections = [
+  { id: 'education', label: t('cv.education'), show: cv.education.length > 0 },
+  { id: 'experience', label: t('cv.experience'), show: cv.experience.length > 0 },
+  { id: 'publications', label: t('cv.publications'), show: papers.length > 0 },
+  { id: 'awards', label: t('cv.awards'), show: cv.awards.length > 0 },
+  { id: 'skills', label: t('cv.skills'), show: cv.skills.length > 0 },
+  { id: 'background', label: t('cv.background'), show: !!cv.background },
+].filter((s) => s.show);
+---
+
+<Base lang={lang} title={t('cv.title')} description={tr(cv.summary, lang)}>
+  <div class="wrap cv">
+    <aside class="id">
+      <div class="sticky">
+        <h1 data-reveal>{name}</h1>
+        <p class="role" data-reveal style="--i:1">{tr(profile.role, lang)}</p>
+        <p class="role muted" data-reveal style="--i:1">{tr(profile.affiliation, lang)}</p>
+        {profile.location && <p class="role muted" data-reveal style="--i:1">{tr(profile.location, lang)}</p>}
+
+        <div class="actions no-print" data-reveal style="--i:2">
+          <a class="btn btn-primary" href={pdf} download data-cv-pdf>
+            <Icon name="download" />
+            {t('cv.download')}
+          </a>
+          <button class="btn" type="button" data-cv-print>
+            <Icon name="print" />
+            {t('cv.print')}
+          </button>
+        </div>
+
+        <section class="contact" data-reveal style="--i:3">
+          <p class="label">{t('cv.contact')}</p>
+          <dl>
+            {contacts.map((c) => (
+              <div>
+                <dt>{c.label}</dt>
+                <dd>{c.value ? <a href={c.url}>{c.value}</a> : <span class="pending">{t('link.pending')}</span>}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
+        <nav class="index no-print" aria-label={t('cv.title')} data-reveal style="--i:4">
+          <ol>
+            {sections.map((s, i) => (
+              <li><a href={`#${s.id}`}><span class="label">{String(i + 1).padStart(2, '0')}</span>{s.label}</a></li>
+            ))}
+          </ol>
+        </nav>
+      </div>
+    </aside>
+
+    <div class="sheet">
+      <p class="summary" data-reveal>{tr(cv.summary, lang)}</p>
+
+      <section id="education" aria-labelledby="h-education">
+        <h2 id="h-education" data-reveal>{t('cv.education')}</h2>
+        <Timeline items={cv.education} lang={lang} />
+      </section>
+
+      <section id="experience" aria-labelledby="h-experience">
+        <h2 id="h-experience" data-reveal>{t('cv.experience')}</h2>
+        <Timeline items={cv.experience} lang={lang} />
+      </section>
+
+      <section id="publications" aria-labelledby="h-publications">
+        <h2 id="h-publications" data-reveal>{t('cv.publications')}</h2>
+        <ol class="refs">
+          {papers.map((p, i) => (
+            <li data-reveal>
+              <span class="label">[{papers.length - i}]</span>
+              <p><span set:html={authorsHtml(p.authors)} />. {tr(p.title, lang)}. <em>{tr(p.venue, lang)}</em>, {p.year}.</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section id="awards" aria-labelledby="h-awards">
+        <h2 id="h-awards" data-reveal>{t('cv.awards')}</h2>
+        <Timeline items={cv.awards} lang={lang} />
+      </section>
+
+      <section id="skills" aria-labelledby="h-skills">
+        <h2 id="h-skills" data-reveal>{t('cv.skills')}</h2>
+        <dl class="skills" data-reveal>
+          {cv.skills.map((group) => (
+            <div>
+              <dt class="label">{tr(group.group, lang)}</dt>
+              <dd>{group.items.join(' · ')}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {cv.background && (
+        <section id="background" aria-labelledby="h-background">
+          <h2 id="h-background" data-reveal>{t('cv.background')}</h2>
+          <p class="background" data-reveal>{tr(cv.background, lang)}</p>
+        </section>
+      )}
+    </div>
+  </div>
+</Base>
+
+<script>
+  document.querySelector('[data-cv-print]')?.addEventListener('click', () => print());
+
+  // The PDF is produced at build time. Where it doesn't exist (the dev server, or a
+  // build without Chrome), fall back to the browser's own print-to-PDF.
+  const link = document.querySelector<HTMLAnchorElement>('[data-cv-pdf]');
+  link?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    const found = await fetch(link.href, { method: 'HEAD' }).then((r) => r.ok).catch(() => false);
+    if (!found) return print();
+    const a = document.createElement('a');
+    a.href = link.href;
+    a.download = '';
+    a.click();
+  });
+</script>
+
+<style>
+  .cv {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr);
+    gap: clamp(32px, 7vw, 96px);
+    padding-top: calc(var(--nav-h) + clamp(64px, 8vw, 104px));
+  }
+  .sticky { position: sticky; top: calc(var(--nav-h) + 44px); }
+  h1 { font-size: var(--fs-3xl); letter-spacing: -0.04em; }
+  :global(:lang(zh)) h1 { letter-spacing: 0; }
+  .role { margin-top: 8px; font-family: var(--font-display); font-weight: 600; }
+  .muted { margin-top: 0; font-family: var(--font-body); font-weight: 400; font-size: var(--fs-sm); color: var(--ink-3); }
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 20px; }
+  .contact { margin-top: 26px; }
+  .contact dl { margin-top: 8px; }
+  .contact div {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+    font-size: var(--fs-sm);
+  }
+  .contact dt { color: var(--ink-3); }
+  .contact dd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .contact a:hover { color: var(--blue); }
+  .pending { color: var(--ink-3); font-size: var(--fs-xs); }
+  .index { margin-top: 26px; }
+  .index a {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 3px 0;
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+    transition: color var(--t-fast);
+  }
+  .index a:hover { color: var(--blue); }
+  .index .label { font-size: 0.6875rem; }
+
+  .summary {
+    max-width: 62ch;
+    font-family: var(--font-display);
+    font-size: var(--fs-xl);
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: -0.012em;
+  }
+  section { margin-top: clamp(40px, 5vw, 60px); scroll-margin-top: calc(var(--nav-h) + 40px); }
+  .sheet > section:first-of-type { margin-top: 44px; }
+  h2 {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+    font-size: var(--fs-md);
+    font-weight: 700;
+    letter-spacing: -0.005em;
+  }
+
+  .refs li {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    padding-block: 7px;
+    font-size: var(--fs-sm);
+    color: var(--ink-2);
+  }
+  .refs :global(strong) { color: var(--ink); font-weight: 600; }
+  .refs .label { padding-top: 2px; font-size: 0.6875rem; }
+
+  .skills { display: grid; gap: 10px; }
+  .skills div { display: grid; grid-template-columns: 128px 1fr; gap: 28px; font-size: var(--fs-sm); }
+  .skills dd { color: var(--ink-2); }
+  .background { max-width: 66ch; color: var(--ink-2); }
+
+  @media (max-width: 860px) {
+    .cv { grid-template-columns: 1fr; }
+    .sticky { position: static; }
+    .index { display: none; }
+  }
+
+  @media print {
+    @page { margin: 16mm 15mm; size: A4; }
+    .cv { display: block; padding: 0; width: 100%; }
+    .sticky { position: static; }
+    h1 { font-size: 26pt; }
+    .contact { margin-top: 8px; }
+    .contact dl { display: flex; flex-wrap: wrap; gap: 0 18px; margin: 0; }
+    .contact div { border: 0; padding: 0; gap: 5px; font-size: 9pt; }
+    .contact .label { display: none; }
+    .summary { margin-top: 14px; font-size: 10.5pt; max-width: none; }
+    section, .sheet > section:first-of-type { margin-top: 16px; break-inside: avoid-page; }
+    h2 { margin-bottom: 8px; padding-bottom: 3px; font-size: 11pt; border-color: #999; }
+    .refs li, .skills div { font-size: 9.5pt; }
+  }
+</style>

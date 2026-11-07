@@ -1,0 +1,49 @@
+# The knowledge taxonomy: three categories, each split into fields.
+#
+# It mirrors the folders of the vault:  content/notes/<category>/<field>/Note.md
+# Adding a field is two steps: create the folder, then list it here for its name.
+# A folder with no entry here still works, using the folder name as its label.
+
+- id: math
+  name: { en: Mathematics, zh: 数学 }
+  fields:
+    - id: computation
+      name: { en: Computation, zh: 计算 }
+    - id: optimization
+      name: { en: Optimization, zh: 优化 }
+    - id: control
+      name: { en: Control, zh: 控制 }
+    - id: theory
+      name: { en: Theoretical Mathematics, zh: 理论数学 }
+
+- id: electrical
+  name: { en: Electrical Engineering, zh: 电气 }
+  fields:
+    - id: circuits
+      name: { en: Circuits, zh: 电路 }
+    - id: digital-electronics
+      name: { en: Digital Electronics, zh: 数电 }
+    - id: analog-electronics
+      name: { en: Analog Electronics, zh: 模电 }
+    - id: microcontrollers
+      name: { en: Microcontrollers, zh: 微控制器 }
+    - id: electric-machines
+      name: { en: Electric Machines, zh: 电机 }
+    - id: power-systems
+      name: { en: Power Systems, zh: 电力系统 }
+    - id: automatic-control
+      name: { en: Automatic Control, zh: 自控 }
+    - id: electromagnetics
+      name: { en: Electromagnetic Fields, zh: 电磁场 }
+    - id: power-electronics
+      name: { en: Power Electronics, zh: 电力电子 }
+    - id: high-voltage
+      name: { en: High Voltage, zh: 高压电 }
+
+- id: ml
+  name: { en: Machine Learning, zh: 机器学习 }
+  fields:
+    - id: deep-learning
+      name: { en: Deep Learning, zh: 深度学习 }
+    - id: reinforcement-learning
+      name: { en: Reinforcement Learning, zh: 强化学习 }
