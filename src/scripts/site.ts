@@ -42,9 +42,12 @@ const nav = document.querySelector<HTMLElement>('[data-nav]');
 const menuButton = document.querySelector<HTMLButtonElement>('[data-menu-toggle]');
 
 if (nav) {
-  const onScroll = () => nav.classList.toggle('is-scrolled', scrollY > 24);
-  onScroll();
-  addEventListener('scroll', onScroll, { passive: true });
+  // An observer instead of a scroll listener: no work at all during a scroll.
+  const sentinel = document.createElement('div');
+  sentinel.style.cssText = 'position:absolute;top:24px;left:0;width:1px;height:1px;pointer-events:none';
+  sentinel.setAttribute('aria-hidden', 'true');
+  document.body.prepend(sentinel);
+  new IntersectionObserver(([entry]) => nav.classList.toggle('is-scrolled', !entry.isIntersecting)).observe(sentinel);
 }
 
 const setMenu = (open: boolean) => {
@@ -56,14 +59,22 @@ menuButton?.addEventListener('click', () => setMenu(!nav?.classList.contains('is
 /* --- Card light: one delegated listener for every card ----------------------- */
 
 if (matchMedia('(hover: hover)').matches) {
+  let pending: PointerEvent | null = null;
+  const flush = () => {
+    const e = pending!;
+    pending = null;
+    const card = (e.target as Element).closest?.<HTMLElement>('.card');
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    card.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+    card.style.setProperty('--my', `${e.clientY - rect.top}px`);
+  };
+  // Pointers report faster than the display refreshes: at most one update per frame.
   document.addEventListener(
     'pointermove',
     (e) => {
-      const card = (e.target as Element).closest?.<HTMLElement>('.card');
-      if (!card) return;
-      const rect = card.getBoundingClientRect();
-      card.style.setProperty('--mx', `${e.clientX - rect.left}px`);
-      card.style.setProperty('--my', `${e.clientY - rect.top}px`);
+      if (!pending) requestAnimationFrame(flush);
+      pending = e;
     },
     { passive: true },
   );
@@ -73,7 +84,7 @@ if (matchMedia('(hover: hover)').matches) {
 
 /** An irregular blot as polygon vertices. Equal vertex counts let it animate. */
 function inkBlot(x: number, y: number, radius: number) {
-  const steps = 240;
+  const steps = 128;
   const phase = Math.random() * 10;
   const points: string[] = [];
   for (let i = 0; i < steps; i++) {
@@ -168,5 +179,5 @@ document.addEventListener('click', async (e) => {
 
 /* --- Hero landscape: only pages that have one load the code ------------------ */
 
-const hero = document.querySelector<HTMLCanvasElement>('[data-shanshui]');
+const hero = document.querySelector<HTMLElement>('[data-shanshui]');
 if (hero) import('./shanshui').then((m) => m.initShanshui(hero));

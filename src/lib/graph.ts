@@ -8,8 +8,8 @@ import { getVault, slugify } from './vault';
 import { getDomains, getPublications } from './data';
 import { tr } from '../i18n';
 import type { Localized } from './data';
+import type { NodeType } from './graph-shared';
 
-export type NodeType = 'note' | 'ghost' | 'paper' | 'project';
 type Both = { en: string; zh: string };
 
 export interface GraphNode {

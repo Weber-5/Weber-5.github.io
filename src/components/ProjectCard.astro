@@ -46,6 +46,8 @@ const title = tr(data.title, lang);
     width: 100%;
     height: 100%;
     object-fit: cover;
+    /* Its own layer: scaling a detailed SVG in place would repaint it every frame. */
+    will-change: transform;
     transition: transform 900ms var(--ease);
   }
   .project:hover .media img,

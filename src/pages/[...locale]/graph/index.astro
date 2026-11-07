@@ -212,10 +212,10 @@ const listed = (domain: string, field?: string) =>
   .map:focus-visible { box-shadow: inset 0 0 0 2px var(--blue); }
 
   /* Shared glass surface */
+  /* No backdrop-filter: over a canvas that repaints, each panel would re-blur per frame. */
   .panel, .detail, .dock, .trace-card {
     border: 1px solid var(--line);
-    background: var(--glass);
-    backdrop-filter: blur(20px) saturate(1.4);
+    background: var(--glass-strong);
     box-shadow: var(--shadow-2);
   }
 

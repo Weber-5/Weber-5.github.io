@@ -108,8 +108,9 @@ const isActive = (p: string) => path.startsWith(p);
     inset: 0;
     z-index: -1;
     border-radius: inherit;
-    backdrop-filter: blur(0px) saturate(1);
-    transition: backdrop-filter var(--t-med) var(--ease);
+    backdrop-filter: blur(16px) saturate(1.4);
+    opacity: 0;
+    transition: opacity var(--t-med) var(--ease);
   }
   .nav:global(.is-scrolled),
   .nav:global(.is-open) {
@@ -120,7 +121,7 @@ const isActive = (p: string) => path.startsWith(p);
     box-shadow: var(--shadow-2);
   }
   .nav:global(.is-scrolled)::before,
-  .nav:global(.is-open)::before { backdrop-filter: blur(18px) saturate(1.5); }
+  .nav:global(.is-open)::before { opacity: 1; }
 
   .bar {
     display: flex;
@@ -231,9 +232,10 @@ const isActive = (p: string) => path.startsWith(p);
     .search kbd { display: none; }
     .nav:global(.is-scrolled),
     .nav:global(.is-open) { width: min(100% - 2 * var(--gutter), var(--max)); }
-    .nav { border-color: var(--line); background: var(--glass); }
+    /* Phones have the weakest GPUs: a solid bar costs nothing and reads the same. */
+    .nav { border-color: var(--line); background: var(--glass-strong); }
     .bar { padding-inline: 10px 8px; }
-    .nav::before { backdrop-filter: blur(18px) saturate(1.5); }
+    .nav::before { display: none; }
   }
   @media (min-width: 821px) {
     .sheet { display: none; }

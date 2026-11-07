@@ -36,14 +36,25 @@ export function initNotePage(root: HTMLElement) {
     const headings = [...links.keys()]
       .map((id) => document.getElementById(id))
       .filter((h): h is HTMLElement => !!h);
+    let queued = false;
     const mark = () => {
+      queued = false;
       let current = headings[0];
       for (const h of headings) {
         if (h.getBoundingClientRect().top < 140) current = h;
       }
       links.forEach((a, id) => a.classList.toggle('is-active', id === current?.id));
     };
-    addEventListener('scroll', mark, { passive: true });
+    addEventListener(
+      'scroll',
+      () => {
+        if (!queued) {
+          queued = true;
+          requestAnimationFrame(mark);
+        }
+      },
+      { passive: true },
+    );
     mark();
   }
 

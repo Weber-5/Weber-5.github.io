@@ -95,7 +95,6 @@ body {
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
   font-feature-settings: 'cv11', 'ss03';
   overflow-x: clip;
 }
@@ -220,8 +219,7 @@ p { text-wrap: pretty; }
   font-weight: 500;
   white-space: nowrap;
   color: var(--ink);
-  background: var(--glass);
-  backdrop-filter: blur(8px);
+  background: var(--glass-strong);
   transition:
     transform var(--t-fast) var(--ease),
     border-color var(--t-fast) var(--ease),
@@ -251,7 +249,6 @@ p { text-wrap: pretty; }
   border-style: dashed;
   color: var(--ink-3);
   background: transparent;
-  backdrop-filter: none;
   cursor: default;
 }
 .btn[aria-disabled='true']:hover { transform: none; box-shadow: none; border-color: var(--line-2); }
@@ -345,21 +342,67 @@ a.chip:hover { color: var(--blue); border-color: var(--blue); background: var(--
 
 /* --- Scroll reveal: ink settling onto paper -------------------------------- */
 
+/* Opacity and transform only: both run on the compositor, unlike an animated blur. */
 .js [data-reveal] {
   opacity: 0;
   transform: translateY(14px);
-  filter: blur(3px);
   transition:
     opacity var(--t-slow) var(--ease),
-    transform var(--t-slow) var(--ease),
-    filter var(--t-slow) var(--ease);
+    transform var(--t-slow) var(--ease);
   transition-delay: calc(var(--i, 0) * 70ms);
 }
 .js [data-reveal].is-in {
   opacity: 1;
   transform: none;
-  filter: none;
 }
+
+/* --- Hero landscape: painted once, then moved only by the compositor ------------ */
+
+.ls-layer, .ls-sway {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+}
+.ls-sway { animation: ls-sway var(--period) ease-in-out infinite alternate; }
+.ls-layer canvas { position: absolute; display: block; max-width: none; }
+
+@keyframes ls-sway {
+  from { transform: translate3d(calc(var(--sway) * -1), 0, 0); }
+  to { transform: translate3d(var(--sway), 0, 0); }
+}
+
+.ls-mist {
+  position: absolute;
+  right: -12%;
+  bottom: 16%;
+  width: 78%;
+  height: 34%;
+  background: radial-gradient(closest-side, var(--paper), transparent);
+  opacity: 0.55;
+  will-change: transform;
+  animation: ls-mist 37s ease-in-out infinite alternate;
+}
+@keyframes ls-mist {
+  from { transform: translate3d(-9%, 0, 0); }
+  to { transform: translate3d(9%, 3%, 0); }
+}
+
+.ls-signal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 30px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--blue));
+  box-shadow: 8px 0 10px 1px var(--blue-glow);
+  transform-origin: 100% 50%;
+  margin-left: -30px;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.landscape.is-paused * { animation-play-state: paused; }
 
 /* --- Page transitions: native cross-document view transitions --------------- */
 
@@ -382,6 +425,10 @@ html.theme-switching::view-transition-old(root) { animation: none; z-index: 1; }
 html.theme-switching::view-transition-new(root) { animation: none; z-index: 2; }
 html.theme-switching .nav,
 html.theme-switching .nav .pill { view-transition-name: none !important; }
+/* Colours snap under the snapshot; otherwise every element animates during the reveal. */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after { transition: none !important; }
 
 /* --- Respect the user's motion preference ---------------------------------- */
 
@@ -393,7 +440,8 @@ html.theme-switching .nav .pill { view-transition-name: none !important; }
     transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
-  .js [data-reveal] { opacity: 1; transform: none; filter: none; }
+  .js [data-reveal] { opacity: 1; transform: none; }
+  .ls-signal, .ls-mist { display: none; }
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }
@@ -405,5 +453,5 @@ html.theme-switching .nav .pill { view-transition-name: none !important; }
   html, html[data-theme] { color-scheme: light; }
   html, body { background: #fff; }
   .nav, .footer, .no-print, .skip-link { display: none !important; }
-  .js [data-reveal] { opacity: 1; transform: none; filter: none; }
+  .js [data-reveal] { opacity: 1; transform: none; }
 }

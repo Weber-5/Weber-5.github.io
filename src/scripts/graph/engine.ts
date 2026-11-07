@@ -1,10 +1,6 @@
 /**
  * InkGraph: the knowledge-graph renderer.
  *
- * d3-force computes the layout once, up front, so the map appears already settled.
- * After that the canvas repaints only while something is actually moving, which
- * means an idle graph costs nothing.
- *
  * Visual language:
  *   notes    ink dots, sized by how connected they are
  *   ghosts   hollow rings: unwritten notes that others already point at
@@ -14,21 +10,22 @@
  *
  * One engine, three modes: `full` (the explorer), `preview` (home page, ambient),
  * `local` (a note's neighbourhood).
+ *
+ * Performance model, in order of what mattered most when measured:
+ *   - The layout arrives precomputed, so nothing simulates at load.
+ *   - Two stacked canvases. The scene (map, links, nodes, labels) repaints only when
+ *     something in it changes. Continuous effects (signals, blooms) live on a thin
+ *     overlay, so a highlighted node costs a few dots per frame, not a full repaint.
+ *   - Labels are cached bitmaps: stroked text is the most expensive thing to draw.
+ *   - Links are batched into a handful of paths by style.
+ *   - Idle costs nothing: with no change pending, no frame is requested at all.
  */
-import {
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  forceX,
-  forceY,
-  type Simulation,
-  type SimulationLinkDatum,
-  type SimulationNodeDatum,
-} from 'd3-force';
+import { hashString, nodeRadius, type NodeType } from '../../lib/graph-shared';
+import type { LayoutLink, LayoutNode } from '../../lib/graph-layout';
 
-export type NodeType = 'note' | 'ghost' | 'paper' | 'project';
+export type { NodeType };
 type Both = { en: string; zh: string };
+type Box = [number, number, number, number];
 
 export interface GraphNode {
   id: string;
@@ -41,6 +38,10 @@ export interface GraphNode {
   tags?: string[];
   date: string;
   status?: string;
+  x?: number;
+  y?: number;
+  ax?: number;
+  ay?: number;
 }
 
 export interface GraphDomain {
@@ -55,14 +56,11 @@ export interface GraphData {
   domains: GraphDomain[];
 }
 
-export interface SimNode extends GraphNode, SimulationNodeDatum {
+export interface SimNode extends Omit<GraphNode, 'x' | 'y' | 'ax' | 'ay'>, LayoutNode {
   x: number;
   y: number;
   degree: number;
-  r: number;
   neighbors: Set<SimNode>;
-  anchorX: number;
-  anchorY: number;
   /** Eased display state. */
   alpha: number;
   hot: number;
@@ -70,11 +68,17 @@ export interface SimNode extends GraphNode, SimulationNodeDatum {
   seed: number;
 }
 
-interface SimLink extends SimulationLinkDatum<SimNode> {
+interface SimLink extends LayoutLink {
   source: SimNode;
   target: SimNode;
   bend: number;
   hot: number;
+}
+
+interface Sprite {
+  canvas: HTMLCanvasElement;
+  width: number;
+  height: number;
 }
 
 export interface Filter {
@@ -89,6 +93,8 @@ export interface GraphOptions {
   mode: 'full' | 'preview' | 'local';
   focus?: string;
   forceDark?: boolean;
+  /** Upper bound on the backing-store scale. */
+  maxScale?: number;
   /** Space the UI covers, so fitting the view keeps the map in the free area. */
   inset?: () => { left: number; right: number; top: number; bottom: number };
   onSelect?: (node: SimNode | null) => void;
@@ -100,15 +106,10 @@ const TAU = Math.PI * 2;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const FONT = `'Inter Variable', 'Noto Sans SC Variable', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif`;
 const MONO = `'JetBrains Mono Variable', 'Noto Sans SC Variable', 'PingFang SC', 'Microsoft YaHei', monospace`;
-
-function hashString(s: string) {
-  let h = 2166136261;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return (h >>> 0) / 4294967296;
-}
+/** Time constant of all eased state, so motion is identical at 60 Hz and 144 Hz. */
+const EASE_MS = 95;
+/** Rebuilding the ink wash is the one slow step; cap it during drags and replays. */
+const CLOUD_INTERVAL_MS = 130;
 
 const PALETTES = {
   light: {
@@ -131,38 +132,18 @@ const PALETTES = {
   },
 };
 
-/** Keep a node's closest surroundings: a two-hop ego network, capped for legibility. */
-function egoNetwork(data: GraphData, focus: string, cap = 26): GraphData {
-  const adjacent = new Map<string, Set<string>>();
-  for (const { source, target } of data.links) {
-    if (!adjacent.has(source)) adjacent.set(source, new Set());
-    if (!adjacent.has(target)) adjacent.set(target, new Set());
-    adjacent.get(source)!.add(target);
-    adjacent.get(target)!.add(source);
-  }
-  const keep = new Set([focus]);
-  const first = [...(adjacent.get(focus) ?? [])];
-  first.forEach((id) => keep.add(id));
-  for (const id of first) {
-    for (const next of adjacent.get(id) ?? []) {
-      if (keep.size >= cap) break;
-      keep.add(next);
-    }
-  }
-  return {
-    nodes: data.nodes.filter((n) => keep.has(n.id)),
-    links: data.links.filter((l) => keep.has(l.source) && keep.has(l.target)),
-    domains: data.domains,
-  };
-}
-
 export class InkGraph {
   nodes: SimNode[] = [];
   links: SimLink[] = [];
   byId = new Map<string, SimNode>();
   domains: GraphDomain[];
+  selected: SimNode | null = null;
+  onWanderStop?: () => void;
 
   private ctx: CanvasRenderingContext2D;
+  private fx: HTMLCanvasElement;
+  private fxCtx: CanvasRenderingContext2D;
+  private fxUsed = false;
   private w = 0;
   private h = 0;
   private dpr = 1;
@@ -173,14 +154,16 @@ export class InkGraph {
   private camDuration = 0;
   private userMoved = false;
 
-  private sim: Simulation<SimNode, SimLink>;
+  private sim: ReturnType<typeof import('../../lib/graph-layout').createSimulation> | null = null;
+  private simLoading = false;
   private dark: boolean;
   private raf = 0;
+  private lastFrame = 0;
+  private sceneDirty = true;
   private still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   private cleanups: (() => void)[] = [];
 
   private hover: SimNode | null = null;
-  selected: SimNode | null = null;
   private path: SimNode[] = [];
   private pathKeys = new Set<string>();
   private filter: Filter = {};
@@ -190,13 +173,19 @@ export class InkGraph {
   private cloud = document.createElement('canvas');
   private cloudBox = { x: 0, y: 0, w: 0, h: 0 };
   private cloudDirty = true;
+  private cloudAt = -1e9;
   private stains = new Map<string, HTMLCanvasElement>();
   private grain: HTMLCanvasElement | null = null;
   private regions: { name: string; x: number; y: number; level: 'domain' | 'field'; domain: string; field?: string }[] = [];
 
+  private sprites = new Map<string, Sprite>();
+  private labelOrder: SimNode[] = [];
+  private labelKey = '';
+
   private pointers = new Map<number, { x: number; y: number }>();
   private drag: { node?: SimNode; lastX: number; lastY: number; moved: number } | null = null;
   private pinch: { dist: number; k: number } | null = null;
+  private wanderTimer = 0;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -204,22 +193,23 @@ export class InkGraph {
     private opts: GraphOptions,
   ) {
     this.ctx = canvas.getContext('2d')!;
+    this.fx = document.createElement('canvas');
+    this.fx.setAttribute('aria-hidden', 'true');
+    this.fx.style.cssText = 'position:absolute;pointer-events:none';
+    this.fx.style.zIndex = getComputedStyle(canvas).zIndex;
+    canvas.after(this.fx);
+    this.fxCtx = this.fx.getContext('2d')!;
+
     this.dark = opts.forceDark || document.documentElement.dataset.theme === 'dark';
     this.domains = data.domains;
 
-    const source = opts.mode === 'local' && opts.focus ? egoNetwork(data, opts.focus) : data;
-    this.buildNodes(source);
-    this.sim = this.layout();
+    this.buildNodes(data);
     this.collectRegions();
-
     this.resize();
     this.fit(false);
     this.bindEvents();
-    if (opts.mode === 'local' && opts.focus) {
-      this.selected = this.byId.get(opts.focus) ?? null;
-    }
-    document.fonts?.ready.then(() => this.kick());
-    this.kick();
+    if (opts.mode === 'local' && opts.focus) this.selected = this.byId.get(opts.focus) ?? null;
+    this.invalidate();
   }
 
   /* --- Setup --------------------------------------------------------------- */
@@ -227,13 +217,13 @@ export class InkGraph {
   private buildNodes(data: GraphData) {
     this.nodes = data.nodes.map((n) => ({
       ...n,
-      x: 0,
-      y: 0,
+      x: n.x ?? 0,
+      y: n.y ?? 0,
+      ax: n.ax ?? 0,
+      ay: n.ay ?? 0,
       degree: 0,
       r: 3,
       neighbors: new Set(),
-      anchorX: 0,
-      anchorY: 0,
       alpha: 1,
       hot: 0,
       born: -1e9,
@@ -252,100 +242,22 @@ export class InkGraph {
       return [{ source, target, bend: (hashString(l.source + l.target) - 0.5) * 0.22, hot: 0 }];
     });
 
-    for (const n of this.nodes) {
-      n.r = n.type === 'ghost' ? 2.4 : 2.2 + Math.sqrt(n.degree) * 1.6;
-      if (n.type === 'paper' || n.type === 'project') n.r += 1.2;
-    }
+    for (const n of this.nodes) n.r = nodeRadius(n.type, n.degree);
   }
 
-  /**
-   * Continents first: the largest domain anchors the right, the others fan out to
-   * its left. A triangle fills a screen far better than a row does, and the left
-   * side is where the control panel leaves room. Fields then spread inside each
-   * continent along a golden-angle spiral.
-   */
-  private assignAnchors() {
-    const counts = new Map<string, number>();
-    for (const n of this.nodes) counts.set(n.domain, (counts.get(n.domain) ?? 0) + 1);
-    const order = [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)!);
-    const radius = (id: string) => 33 * Math.sqrt(counts.get(id)!);
-
-    const centers = new Map<string, { x: number; y: number }>();
-    const main = order[0];
-    if (main) centers.set(main, { x: 0, y: 0 });
-    const others = order.slice(1);
-    const fan = 0.22 * others.length;
-    others.forEach((id, i) => {
-      const u = others.length > 1 ? i / (others.length - 1) : 0.5;
-      const angle = Math.PI + fan - 2 * fan * u;
-      const dist = radius(main) + radius(id) + 70;
-      centers.set(id, { x: Math.cos(angle) * dist, y: Math.sin(angle) * dist });
-    });
-
-    for (const id of order) {
-      const center = centers.get(id)!;
-      const members = this.nodes.filter((n) => n.domain === id);
-      const fields = [...new Set(members.map((n) => n.field ?? ''))].sort();
-      fields.forEach((field, j) => {
-        const spread = radius(id) * 0.92 * Math.sqrt((j + 0.5) / fields.length);
-        const angle = j * 2.39996 + hashString(id) * TAU;
-        const fx = center.x + (fields.length > 1 ? Math.cos(angle) * spread : 0);
-        const fy = center.y + (fields.length > 1 ? Math.sin(angle) * spread : 0);
-        for (const n of members) {
-          if ((n.field ?? '') !== field) continue;
-          n.anchorX = fx;
-          n.anchorY = fy;
-          // Start near home so the layout converges to the same map every time.
-          n.x = fx + (n.seed - 0.5) * 60;
-          n.y = fy + (hashString(`${n.id}y`) - 0.5) * 60;
-        }
-      });
-    }
-  }
-
-  private layout() {
-    const local = this.opts.mode === 'local';
-    if (!local) this.assignAnchors();
-    else {
-      this.nodes.forEach((n, i) => {
-        const a = (i / this.nodes.length) * TAU;
-        n.x = Math.cos(a) * 60;
-        n.y = Math.sin(a) * 60;
-      });
-      const focus = this.opts.focus ? this.byId.get(this.opts.focus) : undefined;
-      if (focus) {
-        focus.fx = 0;
-        focus.fy = 0;
-      }
-    }
-
-    const sim = forceSimulation<SimNode, SimLink>(this.nodes)
-      .force(
-        'link',
-        forceLink<SimNode, SimLink>(this.links)
-          .distance((l) => (local ? 46 : l.source.field === l.target.field ? 26 : 90))
-          .strength((l) => {
-            if (local) return 0.5;
-            if (l.source.field === l.target.field) return 0.5;
-            // Cross references are drawn, but must not drag the continents together.
-            return l.source.domain === l.target.domain ? 0.02 : 0.002;
-          }),
-      )
-      .force('charge', forceManyBody<SimNode>().strength(local ? -120 : -46).distanceMax(120))
-      .force('collide', forceCollide<SimNode>((n) => n.r + (local ? 12 : 7)).iterations(2))
-      .force('x', forceX<SimNode>((n) => n.anchorX).strength(local ? 0.05 : 0.24))
-      .force('y', forceY<SimNode>((n) => n.anchorY).strength(local ? 0.05 : 0.24))
-      .stop();
-    sim.tick(320);
-    sim.on('tick', () => {
+  /** Dragging is the only thing that needs physics, so it loads on the first drag. */
+  private async ensureSimulation() {
+    if (this.sim || this.simLoading) return;
+    this.simLoading = true;
+    const { createSimulation } = await import('../../lib/graph-layout');
+    this.sim = createSimulation(this.nodes, this.links);
+    this.sim.on('tick', () => {
       this.cloudDirty = true;
-      this.collectRegions();
-      this.kick();
+      this.invalidate();
     });
-    return sim;
   }
 
-  /** Where the domain and field names sit: above each continent, at each field's heart. */
+  /** Where the domain and field names sit: above each continent, and above each field. */
   private collectRegions() {
     if (this.opts.mode === 'local') return;
     const nameOf = (v: Both) => v[this.opts.lang] || v.en;
@@ -375,11 +287,21 @@ export class InkGraph {
 
   private resize() {
     const rect = this.canvas.getBoundingClientRect();
-    this.dpr = Math.min(devicePixelRatio || 1, 2);
+    const dpr = Math.min(devicePixelRatio || 1, this.opts.maxScale ?? 2);
+    if (dpr !== this.dpr) this.sprites.clear();
+    this.dpr = dpr;
     this.w = rect.width;
     this.h = rect.height;
-    this.canvas.width = Math.round(rect.width * this.dpr);
-    this.canvas.height = Math.round(rect.height * this.dpr);
+    for (const c of [this.canvas, this.fx]) {
+      c.width = Math.round(rect.width * dpr);
+      c.height = Math.round(rect.height * dpr);
+    }
+    const s = this.fx.style;
+    s.left = `${this.canvas.offsetLeft}px`;
+    s.top = `${this.canvas.offsetTop}px`;
+    s.width = `${rect.width}px`;
+    s.height = `${rect.height}px`;
+    this.fxUsed = false;
   }
 
   private toWorld(sx: number, sy: number) {
@@ -412,14 +334,16 @@ export class InkGraph {
     const target = this.frameFor(this.nodes);
     this.userMoved = false;
     if (animate) this.flyCam(target, 700);
-    else this.cam = target;
-    this.kick();
+    else {
+      this.cam = target;
+      this.invalidate();
+    }
   }
 
   private flyCam(target: typeof this.cam, duration: number) {
     if (this.still) {
       this.cam = target;
-      this.kick();
+      this.invalidate();
       return;
     }
     this.camFrom = { ...this.cam };
@@ -445,8 +369,10 @@ export class InkGraph {
     this.userMoved = true;
     if (animate) this.flyCam(target, 260);
     else {
+      this.camFrom = null;
+      this.camTo = null;
       this.cam = target;
-      this.kick();
+      this.invalidate();
     }
   }
 
@@ -473,7 +399,7 @@ export class InkGraph {
 
   setFilter(filter: Filter) {
     this.filter = { ...this.filter, ...filter };
-    this.kick();
+    this.invalidate();
   }
 
   search(query: string, limit = 7) {
@@ -493,7 +419,7 @@ export class InkGraph {
       if (fly) this.flyTo(node);
     }
     this.opts.onSelect?.(node);
-    this.kick();
+    this.invalidate();
   }
 
   /** Breadth-first shortest path; returns the nodes along it. */
@@ -520,14 +446,14 @@ export class InkGraph {
     this.pathKeys = new Set(path.slice(1).map((n, i) => this.edgeKey(path[i], n)));
     this.flyCam(this.frameFor(path, 0.7), 900);
     this.userMoved = true;
-    this.kick();
+    this.invalidate();
     return path;
   }
 
   clearTrace() {
     this.path = [];
     this.pathKeys.clear();
-    this.kick();
+    this.invalidate();
   }
 
   private edgeKey = (a: SimNode, b: SimNode) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
@@ -535,14 +461,18 @@ export class InkGraph {
   /** Show the map as it stood on a date; null shows everything. */
   setGrowth(date: string | null) {
     const now = performance.now();
+    let changed = false;
     for (const n of this.nodes) {
       const was = !this.growth || n.date <= this.growth;
       const will = !date || n.date <= date;
+      if (was !== will) changed = true;
       if (will && !was) n.born = now;
     }
     this.growth = date;
-    this.cloudDirty = true;
-    this.kick();
+    if (changed) {
+      this.cloudDirty = true;
+      this.invalidate();
+    }
   }
 
   dateRange() {
@@ -554,15 +484,20 @@ export class InkGraph {
     if (this.opts.forceDark) return;
     this.dark = theme === 'dark';
     this.stains.clear();
+    this.sprites.clear();
     this.cloudDirty = true;
-    this.kick();
+    this.cloudAt = -1e9;
+    this.sceneDirty = true;
+    // Theme changes run inside a view transition callback, so paint synchronously:
+    // the snapshot of the new state must already show the new colours.
+    this.frame(performance.now());
   }
 
   /** Ambient highlight for the home page preview. */
   pulse(node: SimNode | null) {
     this.hover = node;
     if (node && !this.still) this.blooms.push({ node, start: performance.now() });
-    this.kick();
+    this.invalidate();
   }
 
   /* --- Input --------------------------------------------------------------- */
@@ -621,13 +556,17 @@ export class InkGraph {
           const world = this.toWorld(p.x, p.y);
           this.drag.node.fx = world.x;
           this.drag.node.fy = world.y;
-          this.sim.alphaTarget(0.18).restart();
+          this.drag.node.x = world.x;
+          this.drag.node.y = world.y;
+          this.sim?.alphaTarget(0.18).restart();
+          this.cloudDirty = true;
+          this.invalidate();
         } else if (full) {
           this.camTo = null;
           this.cam.x += dx;
           this.cam.y += dy;
           this.userMoved = true;
-          this.kick();
+          this.invalidate();
         }
         return;
       }
@@ -636,14 +575,14 @@ export class InkGraph {
       if (hit !== this.hover) {
         this.hover = hit;
         c.style.cursor = hit ? 'pointer' : full ? 'grab' : 'default';
-        this.kick();
+        this.invalidate();
       }
     });
 
     on('pointerleave', () => {
       if (this.opts.mode === 'preview' || !this.drag) {
         this.hover = null;
-        this.kick();
+        this.invalidate();
       }
     });
 
@@ -660,6 +599,7 @@ export class InkGraph {
       this.drag = { node: this.nodeAt(p.x, p.y) ?? undefined, lastX: p.x, lastY: p.y, moved: 0 };
       if (full) c.setPointerCapture(e.pointerId);
       if (full && !this.drag.node) c.style.cursor = 'grabbing';
+      if (full && this.drag.node) void this.ensureSimulation();
     });
 
     const release = (e: PointerEvent) => {
@@ -668,10 +608,10 @@ export class InkGraph {
       const drag = this.drag;
       this.drag = null;
       if (!drag) return;
-      if (drag.node && full && drag.moved > 4) {
+      if (drag.node && full) {
         drag.node.fx = null;
         drag.node.fy = null;
-        this.sim.alphaTarget(0);
+        if (drag.moved > 4) this.sim?.alphaTarget(0);
       }
       if (full) c.style.cursor = this.hover ? 'pointer' : 'grab';
       if (drag.moved > 6) return;
@@ -685,6 +625,7 @@ export class InkGraph {
       }
     };
     on('pointerup', release);
+    // A cancelled pointer is a scroll that took over, never a click.
     on('pointercancel', (e) => {
       this.pointers.delete(e.pointerId);
       this.pinch = null;
@@ -712,7 +653,7 @@ export class InkGraph {
     const ro = new ResizeObserver(() => {
       this.resize();
       if (!this.userMoved) this.fit(false);
-      this.kick();
+      this.invalidate();
     });
     ro.observe(c);
     this.cleanups.push(() => ro.disconnect());
@@ -720,6 +661,15 @@ export class InkGraph {
     const onTheme = ((e: CustomEvent<string>) => this.setTheme(e.detail)) as EventListener;
     addEventListener('themechange', onTheme);
     this.cleanups.push(() => removeEventListener('themechange', onTheme));
+
+    // Text is cached as bitmaps, so a webfont arriving late must refresh them.
+    const onFonts = () => {
+      this.sprites.clear();
+      this.invalidate();
+    };
+    document.fonts?.addEventListener('loadingdone', onFonts);
+    this.cleanups.push(() => document.fonts?.removeEventListener('loadingdone', onFonts));
+    document.fonts?.ready.then(onFonts);
   }
 
   /** Arrow keys walk to the nearest node in that direction, preferring linked ones. */
@@ -766,9 +716,6 @@ export class InkGraph {
 
   /* --- Wander -------------------------------------------------------------- */
 
-  private wanderTimer = 0;
-  onWanderStop?: () => void;
-
   wander() {
     const step = () => {
       const from = this.selected ?? this.nodes[Math.floor(Math.random() * this.nodes.length)];
@@ -789,50 +736,71 @@ export class InkGraph {
     this.onWanderStop?.();
   }
 
-  /* --- Render -------------------------------------------------------------- */
+  /* --- Frame loop ---------------------------------------------------------- */
 
   private kick() {
     if (!this.raf) this.raf = requestAnimationFrame((t) => this.frame(t));
   }
 
-  private frame(now: number) {
-    this.raf = 0;
-    let busy = this.updateCamera(now);
+  /** Mark the scene as changed and schedule a paint. */
+  private invalidate() {
+    this.sceneDirty = true;
+    this.kick();
+  }
 
+  private frame(now: number) {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    const dt = clamp(now - this.lastFrame, 1, 80);
+    this.lastFrame = now;
+    const ease = this.still ? 1 : 1 - Math.exp(-dt / EASE_MS);
+
+    let moving = this.updateCamera(now);
     const focus = this.hover ?? this.selected;
     const neighbours = focus?.neighbors;
     const onPath = new Set(this.path);
     const dimming = !!focus || this.path.length > 0;
-    const ease = this.still ? 1 : 0.16;
+    const dimTo = this.opts.mode === 'local' ? 0.5 : 0.2;
 
     for (const n of this.nodes) {
       let alpha = 1;
       if (!this.isVisible(n)) alpha = 0;
       else if (!this.matches(n)) alpha = 0.1;
-      else if (dimming && n !== focus && !neighbours?.has(n) && !onPath.has(n)) alpha = this.opts.mode === 'local' ? 0.5 : 0.2;
+      else if (dimming && n !== focus && !neighbours?.has(n) && !onPath.has(n)) alpha = dimTo;
       const hot = n === focus || n === this.selected || onPath.has(n) ? 1 : neighbours?.has(n) ? 0.55 : 0;
 
-      n.alpha += (alpha - n.alpha) * ease;
-      n.hot += (hot - n.hot) * ease;
-      if (Math.abs(alpha - n.alpha) > 0.004 || Math.abs(hot - n.hot) > 0.004) busy = true;
-      if (now - n.born < 900) busy = true;
+      const da = alpha - n.alpha;
+      const dh = hot - n.hot;
+      n.alpha = Math.abs(da) < 0.004 ? alpha : n.alpha + da * ease;
+      n.hot = Math.abs(dh) < 0.004 ? hot : n.hot + dh * ease;
+      if (n.alpha !== alpha || n.hot !== hot || now - n.born < 900) moving = true;
     }
 
     for (const l of this.links) {
       const inPath = this.pathKeys.has(this.edgeKey(l.source, l.target));
       const hot = inPath || (focus && (l.source === focus || l.target === focus)) ? 1 : 0;
-      l.hot += (hot - l.hot) * ease;
-      if (Math.abs(hot - l.hot) > 0.004) busy = true;
+      const dh = hot - l.hot;
+      l.hot = Math.abs(dh) < 0.004 ? hot : l.hot + dh * ease;
+      if (l.hot !== hot) moving = true;
     }
 
-    this.blooms = this.blooms.filter((b) => now - b.start < 1100);
-    if (this.blooms.length) busy = true;
-    // Signal pulses keep running along highlighted edges.
-    if ((focus || this.path.length) && !this.still) busy = true;
+    if (this.cloudDirty) {
+      if (now - this.cloudAt >= CLOUD_INTERVAL_MS) {
+        this.cloudAt = now;
+        this.collectRegions();
+        this.paintClouds();
+        this.sceneDirty = true;
+      } else {
+        moving = true;
+      }
+    }
 
-    if (this.cloudDirty) this.paintClouds();
-    this.draw(now, focus);
-    if (busy) this.kick();
+    if (moving || this.sceneDirty) {
+      this.sceneDirty = false;
+      this.paintScene(now, focus);
+    }
+    const effects = this.paintEffects(now, focus);
+    if (moving || effects) this.kick();
   }
 
   private updateCamera(now: number) {
@@ -847,6 +815,7 @@ export class InkGraph {
     if (u >= 1) {
       this.camFrom = null;
       this.camTo = null;
+      this.sceneDirty = true;
       return false;
     }
     return true;
@@ -855,6 +824,8 @@ export class InkGraph {
   private get palette() {
     return PALETTES[this.dark ? 'dark' : 'light'];
   }
+
+  /* --- Ink wash ------------------------------------------------------------ */
 
   private stain(tint: string) {
     let sprite = this.stains.get(tint);
@@ -876,8 +847,8 @@ export class InkGraph {
   /** Low-frequency noise that breaks the wash into mottled, paper-like ink. */
   private grainTexture() {
     if (this.grain) return this.grain;
-    const size = 256;
-    const cells = 16;
+    const size = 128;
+    const cells = 8;
     const lattice = Array.from({ length: cells * cells }, (_, i) => hashString(`g${i}`));
     const at = (x: number, y: number) => lattice[(y % cells) * cells + (x % cells)];
     const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -922,7 +893,8 @@ export class InkGraph {
     const y0 = Math.min(...visible.map((n) => n.y)) - pad;
     const x1 = Math.max(...visible.map((n) => n.x)) + pad;
     const y1 = Math.max(...visible.map((n) => n.y)) + pad;
-    const scale = 0.5;
+    // A blurred wash holds up well at low resolution, and small is fast to draw.
+    const scale = 0.25;
     this.cloudBox = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     this.cloud.width = Math.ceil((x1 - x0) * scale);
     this.cloud.height = Math.ceil((y1 - y0) * scale);
@@ -957,9 +929,10 @@ export class InkGraph {
     g.globalAlpha = 1;
   }
 
-  private draw(now: number, focus: SimNode | null) {
+  /* --- Scene --------------------------------------------------------------- */
+
+  private paintScene(now: number, focus: SimNode | null) {
     const { ctx: c, cam, w, h } = this;
-    const p = this.palette;
     const dotScale = cam.k ** 0.62;
 
     c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -967,7 +940,8 @@ export class InkGraph {
 
     if (this.cloudBox.w) {
       c.globalAlpha = 1;
-      c.imageSmoothingQuality = 'high';
+      c.imageSmoothingEnabled = true;
+      c.imageSmoothingQuality = 'low';
       c.drawImage(
         this.cloud,
         this.cloudBox.x * cam.k + cam.x,
@@ -977,8 +951,27 @@ export class InkGraph {
       );
     }
 
-    // Links: a slight bend gives the hand-drawn feel of a brush line.
+    this.paintLinks();
+
+    for (const n of this.nodes) {
+      if (n.alpha < 0.02) continue;
+      const x = n.x * cam.k + cam.x;
+      const y = n.y * cam.k + cam.y;
+      if (x < -30 || x > w + 30 || y < -30 || y > h + 30) continue;
+      this.paintNode(n, x, y, now, dotScale);
+    }
+
+    this.paintLabels(this.paintRegions(focus), dotScale, focus);
+    c.globalAlpha = 1;
+  }
+
+  /** One path per style instead of one per link. A bend gives a brush-drawn feel. */
+  private paintLinks() {
+    const { ctx: c, cam, w, h } = this;
+    const p = this.palette;
+    const batches = new Map<number, { path: Path2D; dashed: boolean; alpha: number }>();
     c.lineCap = 'round';
+
     for (const l of this.links) {
       const a = l.source;
       const b = l.target;
@@ -991,65 +984,41 @@ export class InkGraph {
       if (Math.max(ax, bx) < 0 || Math.min(ax, bx) > w || Math.max(ay, by) < 0 || Math.min(ay, by) > h) continue;
       const mx = (ax + bx) / 2 - (by - ay) * l.bend;
       const my = (ay + by) / 2 + (bx - ax) * l.bend;
+      const dashed = a.type === 'ghost' || b.type === 'ghost';
 
-      c.beginPath();
-      c.moveTo(ax, ay);
-      c.quadraticCurveTo(mx, my, bx, by);
-      const ghostly = a.type === 'ghost' || b.type === 'ghost';
-      c.setLineDash(ghostly ? [2, 4] : []);
-      const distant = a.domain !== b.domain ? 0.4 : a.field !== b.field ? 0.7 : 1.5;
-      c.strokeStyle = `rgba(${p.ink}, ${p.link * distant * alpha * (1 - l.hot)})`;
-      c.lineWidth = 0.9;
-      c.stroke();
+      if (l.hot < 1) {
+        const distant = a.domain !== b.domain ? 0.4 : a.field !== b.field ? 0.7 : 1.5;
+        const level = Math.round(p.link * distant * alpha * (1 - l.hot) * 50);
+        if (level > 0) {
+          const key = level * 2 + (dashed ? 1 : 0);
+          let batch = batches.get(key);
+          if (!batch) batches.set(key, (batch = { path: new Path2D(), dashed, alpha: level / 50 }));
+          batch.path.moveTo(ax, ay);
+          batch.path.quadraticCurveTo(mx, my, bx, by);
+        }
+      }
+
       if (l.hot > 0.02) {
+        c.beginPath();
+        c.moveTo(ax, ay);
+        c.quadraticCurveTo(mx, my, bx, by);
+        c.setLineDash(dashed ? [2, 4] : []);
         c.strokeStyle = `rgba(${p.blue}, ${0.75 * l.hot * Math.max(alpha, 0.6)})`;
         c.lineWidth = 1 + 0.6 * l.hot;
         c.stroke();
       }
-      c.setLineDash([]);
-
-      // A signal travelling along the highlighted edge.
-      if (l.hot > 0.5 && !this.still) {
-        const u = (now / 1300 + a.seed + b.seed) % 1;
-        const v = 1 - u;
-        const px = v * v * ax + 2 * v * u * mx + u * u * bx;
-        const py = v * v * ay + 2 * v * u * my + u * u * by;
-        c.beginPath();
-        c.arc(px, py, 1.9, 0, TAU);
-        c.fillStyle = `rgba(${p.blue}, ${l.hot})`;
-        c.fill();
-      }
     }
 
-    for (const { node, start } of this.blooms) {
-      const u = clamp((now - start) / 1100, 0, 1);
-      const r = node.r * dotScale + 4 + u * 42;
-      const x = node.x * cam.k + cam.x;
-      const y = node.y * cam.k + cam.y;
-      c.beginPath();
-      c.arc(x, y, r, 0, TAU);
-      c.strokeStyle = `rgba(${p.blue}, ${(1 - u) ** 2 * 0.5})`;
-      c.lineWidth = 1;
-      c.stroke();
-      c.beginPath();
-      c.arc(x, y, r * 0.62, 0, TAU);
-      c.fillStyle = `rgba(${p.blue}, ${(1 - u) ** 3 * 0.09})`;
-      c.fill();
+    c.lineWidth = 0.9;
+    for (const { path, dashed, alpha } of batches.values()) {
+      c.setLineDash(dashed ? [2, 4] : []);
+      c.strokeStyle = `rgba(${p.ink}, ${alpha})`;
+      c.stroke(path);
     }
-
-    for (const n of this.nodes) {
-      if (n.alpha < 0.02) continue;
-      const x = n.x * cam.k + cam.x;
-      const y = n.y * cam.k + cam.y;
-      if (x < -30 || x > w + 30 || y < -30 || y > h + 30) continue;
-      this.drawNode(n, x, y, now, dotScale);
-    }
-
-    this.drawLabels(this.drawRegions(focus), dotScale);
-    c.globalAlpha = 1;
+    c.setLineDash([]);
   }
 
-  private drawNode(n: SimNode, x: number, y: number, now: number, dotScale: number) {
+  private paintNode(n: SimNode, x: number, y: number, now: number, dotScale: number) {
     const c = this.ctx;
     const p = this.palette;
     const age = Math.max(0, now - n.born) / 900;
@@ -1097,67 +1066,102 @@ export class InkGraph {
     c.fill();
   }
 
+  /** Text rendered once into a bitmap, halo included; drawing it is a single copy. */
+  private sprite(text: string, font: string, size: number, rgb: string, spacing = '0px', halo = 3.5) {
+    const key = `${font}|${rgb}|${spacing}|${text}`;
+    let cached = this.sprites.get(key);
+    if (cached) return cached;
+
+    const canvas = document.createElement('canvas');
+    const g = canvas.getContext('2d')!;
+    const setup = () => {
+      g.font = font;
+      if ('letterSpacing' in g) g.letterSpacing = spacing;
+    };
+    setup();
+    const width = Math.ceil(g.measureText(text).width) + 10;
+    const height = Math.ceil(size * 1.5) + 6;
+    canvas.width = Math.ceil(width * this.dpr);
+    canvas.height = Math.ceil(height * this.dpr);
+
+    g.scale(this.dpr, this.dpr);
+    setup();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.lineWidth = halo;
+    g.strokeStyle = `rgba(${this.palette.paper}, 0.86)`;
+    g.strokeText(text, width / 2, height / 2);
+    g.fillStyle = `rgb(${rgb})`;
+    g.fillText(text, width / 2, height / 2);
+
+    cached = { canvas, width, height };
+    this.sprites.set(key, cached);
+    return cached;
+  }
+
+  private stamp(s: Sprite, x: number, y: number, alpha: number) {
+    const c = this.ctx;
+    c.globalAlpha = alpha;
+    c.drawImage(s.canvas, Math.round(x - s.width / 2), Math.round(y - s.height / 2), s.width, s.height);
+  }
+
   /** Draws domain and field names, and returns the space they took. */
-  private drawRegions(focus: SimNode | null) {
-    const placed: [number, number, number, number][] = [];
-    const { ctx: c, cam } = this;
+  private paintRegions(focus: SimNode | null) {
+    const placed: Box[] = [];
+    const { cam } = this;
     const p = this.palette;
     const { domains, fields } = this.filter;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
     const zh = this.opts.lang === 'zh';
     const domainFade = clamp((2.1 - cam.k) / 0.7, 0, 1);
     const fieldFade =
       this.opts.mode === 'preview' ? 0 : clamp((cam.k - 0.5) / 0.22, 0, 1) * clamp((2.6 - cam.k) / 0.6, 0, 1);
 
     for (const region of this.regions) {
-      const x = region.x * cam.k + cam.x;
-      const y = region.y * cam.k + cam.y;
+      const domain = region.level === 'domain';
+      const base = domain ? domainFade * 0.86 : fieldFade * 0.62;
+      if (base < 0.02) continue;
       const inFocus =
-        (focus && focus.domain === region.domain && (region.level === 'domain' || focus.field === region.field)) ||
-        (region.level === 'field' ? fields?.has(region.field!) : domains?.has(region.domain));
-      const base = region.level === 'domain' ? domainFade * 0.86 : fieldFade * 0.62;
-      const alpha = focus || domains || fields ? base * (inFocus ? 1.3 : 0.35) : base;
+        (focus && focus.domain === region.domain && (domain || focus.field === region.field)) ||
+        (domain ? domains?.has(region.domain) : fields?.has(region.field!));
+      const alpha = Math.min(focus || domains || fields ? base * (inFocus ? 1.3 : 0.35) : base, 0.92);
       if (alpha < 0.02) continue;
 
-      const domain = region.level === 'domain';
+      const size = domain ? (zh ? 17 : 12.5) : zh ? 12.5 : 10.5;
+      const font = `${domain ? 600 : 500} ${size}px ${MONO}`;
+      const spacing = domain ? (zh ? '3px' : '2.4px') : '0.3px';
       const text = domain && !zh ? region.name.toUpperCase() : region.name;
-      c.font = domain ? `600 ${zh ? 17 : 12.5}px ${MONO}` : `500 ${zh ? 12.5 : 10.5}px ${MONO}`;
-      if ('letterSpacing' in c) c.letterSpacing = domain ? (zh ? '3px' : '2.4px') : '0.3px';
+      const s = this.sprite(text, font, size, p.ink, spacing, 4);
 
-      const width = c.measureText(text).width;
-      const box: [number, number, number, number] = [x - width / 2 - 4, y - 9, x + width / 2 + 4, y + 9];
-      if (placed.some((b) => b[0] < box[2] && b[2] > box[0] && b[1] < box[3] && b[3] > box[1])) {
-        if ('letterSpacing' in c) c.letterSpacing = '0px';
-        continue;
-      }
+      const x = region.x * cam.k + cam.x;
+      const y = region.y * cam.k + cam.y;
+      const box: Box = [x - s.width / 2, y - 9, x + s.width / 2, y + 9];
+      if (placed.some((b) => b[0] < box[2] && b[2] > box[0] && b[1] < box[3] && b[3] > box[1])) continue;
       if (alpha > 0.15) placed.push(box);
-
-      c.lineJoin = 'round';
-      c.lineWidth = 4;
-      c.strokeStyle = `rgba(${p.paper}, ${Math.min(alpha, 0.8)})`;
-      c.strokeText(text, x, y);
-      c.fillStyle = `rgba(${p.ink}, ${Math.min(alpha, 0.92)})`;
-      c.fillText(text, x, y);
-      if ('letterSpacing' in c) c.letterSpacing = '0px';
+      this.stamp(s, x, y, alpha);
     }
     return placed;
   }
 
   /** Most important first; a label is skipped if it would collide with one already placed. */
-  private drawLabels(placed: [number, number, number, number][], dotScale: number) {
-    const { ctx: c, cam, w, h } = this;
+  private paintLabels(placed: Box[], dotScale: number, focus: SimNode | null) {
+    const { cam, w, h } = this;
     const p = this.palette;
     const lang = this.opts.lang;
     const local = this.opts.mode === 'local';
     const preview = this.opts.mode === 'preview';
 
-    const rank = (n: SimNode) => n.hot * 100 + n.degree + (n.type === 'ghost' ? -5 : 0);
-    const ordered = [...this.nodes].sort((a, b) => rank(b) - rank(a));
-    c.textAlign = 'center';
-    c.textBaseline = 'top';
+    // The order only changes with the focus, so it is not re-sorted on every frame.
+    const key = `${focus?.id ?? ''}|${this.path.length}`;
+    if (key !== this.labelKey || this.labelOrder.length !== this.nodes.length) {
+      this.labelKey = key;
+      const onPath = new Set(this.path);
+      const heat = (n: SimNode) => (n === focus || onPath.has(n) ? 100 : focus?.neighbors.has(n) ? 55 : 0);
+      const rank = (n: SimNode) => heat(n) + n.degree + (n.type === 'ghost' ? -5 : 0);
+      this.labelOrder = [...this.nodes].sort((a, b) => rank(b) - rank(a));
+    }
 
-    for (const n of ordered) {
+    for (const n of this.labelOrder) {
       if (n.alpha < 0.3) continue;
       const hot = n.hot > 0.3;
       const threshold = preview ? 2.4 : clamp(2.05 - n.degree * 0.11, 1.05, 2);
@@ -1165,31 +1169,86 @@ export class InkGraph {
       if (preview && !hot && n.degree < 6) continue;
 
       const x = n.x * cam.k + cam.x;
-      const y = n.y * cam.k + cam.y + n.r * dotScale + 5;
+      const y = n.y * cam.k + cam.y + n.r * dotScale + 11;
       if (x < 0 || x > w || y < 0 || y > h) continue;
 
-      const text = n.title[lang] || n.title.en;
       const size = local ? 11 : hot ? 12.5 : 11;
-      c.font = `${hot ? 600 : 500} ${size}px ${FONT}`;
-      const width = c.measureText(text).width;
-      const box: [number, number, number, number] = [x - width / 2 - 3, y - 1, x + width / 2 + 3, y + size + 2];
+      const font = `${hot ? 600 : 500} ${size}px ${FONT}`;
+      const s = this.sprite(n.title[lang] || n.title.en, font, size, n.hot > 0.7 ? p.blue : p.ink);
+      const box: Box = [x - s.width / 2, y - size / 2 - 2, x + s.width / 2, y + size / 2 + 2];
       if (placed.some((b) => b[0] < box[2] && b[2] > box[0] && b[1] < box[3] && b[3] > box[1])) continue;
       placed.push(box);
-
-      const alpha = n.alpha * (hot ? 1 : 0.74);
-      c.lineJoin = 'round';
-      c.lineWidth = 3.5;
-      c.strokeStyle = `rgba(${p.paper}, ${alpha * 0.9})`;
-      c.strokeText(text, x, y);
-      c.fillStyle = n.hot > 0.7 ? `rgba(${p.blue}, ${alpha})` : `rgba(${p.ink}, ${alpha})`;
-      c.fillText(text, x, y);
+      this.stamp(s, x, y, n.alpha * (hot ? 1 : 0.74));
     }
+  }
+
+  /* --- Effects overlay ----------------------------------------------------- */
+
+  /** Signals on highlighted edges and blooms on selection. True while any is running. */
+  private paintEffects(now: number, focus: SimNode | null) {
+    const { fxCtx: c, cam, w, h } = this;
+    this.blooms = this.blooms.filter((b) => now - b.start < 1100);
+    const signals = !this.still && (!!focus || this.path.length > 0);
+    if (!signals && !this.blooms.length) {
+      if (this.fxUsed) {
+        c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        c.clearRect(0, 0, w, h);
+        this.fxUsed = false;
+      }
+      return false;
+    }
+
+    const p = this.palette;
+    c.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    c.clearRect(0, 0, w, h);
+    this.fxUsed = true;
+
+    if (signals) {
+      c.fillStyle = `rgb(${p.blue})`;
+      for (const l of this.links) {
+        if (l.hot <= 0.5) continue;
+        const a = l.source;
+        const b = l.target;
+        const ax = a.x * cam.k + cam.x;
+        const ay = a.y * cam.k + cam.y;
+        const bx = b.x * cam.k + cam.x;
+        const by = b.y * cam.k + cam.y;
+        const mx = (ax + bx) / 2 - (by - ay) * l.bend;
+        const my = (ay + by) / 2 + (bx - ax) * l.bend;
+        const u = (now / 1300 + a.seed + b.seed) % 1;
+        const v = 1 - u;
+        c.globalAlpha = l.hot;
+        c.beginPath();
+        c.arc(v * v * ax + 2 * v * u * mx + u * u * bx, v * v * ay + 2 * v * u * my + u * u * by, 1.9, 0, TAU);
+        c.fill();
+      }
+      c.globalAlpha = 1;
+    }
+
+    const dotScale = cam.k ** 0.62;
+    for (const { node, start } of this.blooms) {
+      const u = clamp((now - start) / 1100, 0, 1);
+      const r = node.r * dotScale + 4 + u * 42;
+      const x = node.x * cam.k + cam.x;
+      const y = node.y * cam.k + cam.y;
+      c.beginPath();
+      c.arc(x, y, r, 0, TAU);
+      c.strokeStyle = `rgba(${p.blue}, ${(1 - u) ** 2 * 0.5})`;
+      c.lineWidth = 1;
+      c.stroke();
+      c.beginPath();
+      c.arc(x, y, r * 0.62, 0, TAU);
+      c.fillStyle = `rgba(${p.blue}, ${(1 - u) ** 3 * 0.09})`;
+      c.fill();
+    }
+    return true;
   }
 
   destroy() {
     cancelAnimationFrame(this.raf);
-    this.sim.stop();
+    this.sim?.stop();
     this.stopWander();
     this.cleanups.forEach((fn) => fn());
+    this.fx.remove();
   }
 }
