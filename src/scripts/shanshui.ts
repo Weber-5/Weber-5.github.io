@@ -6,10 +6,13 @@
  * The composition protects the text: ranges lie low along the bottom of the left
  * half, passing under the buttons, and only rise on the right behind the portrait.
  *
+ * Distance is told the way ink painting tells it: the far ranges are ink with indigo
+ * mixed in, the near ones plain ink.
+ *
  * Every range is painted exactly once, into its own canvas. All motion after that
- * is compositing: CSS sways the layers, the pointer shifts them for parallax, and a
- * signal rides a ridge on sampled transform keyframes. Nothing repaints per frame, so
- * the animation runs at the display's full refresh rate, even on a busy main thread.
+ * is compositing: CSS sways the layers and the pointer shifts them for parallax.
+ * Nothing repaints per frame, so the animation runs at the display's full refresh
+ * rate, even on a busy main thread.
  */
 
 interface Range {
@@ -24,19 +27,24 @@ interface Range {
   /** Sway distance in px, and its period in seconds. */
   sway: number;
   period: number;
+  /** How much indigo is mixed into this range's ink: 1 for the farthest. */
+  distance: number;
 }
 
 const RANGES: Range[] = [
-  { base: 0.86, amp: 0.74, seed: 3.1, contours: 2, tone: 0.32, freq: 3.4, depth: 4, sway: 9, period: 47 },
-  { base: 0.92, amp: 0.6, seed: 11.7, contours: 3, tone: 0.5, freq: 4.2, depth: 8, sway: 15, period: 39 },
-  { base: 0.98, amp: 0.46, seed: 23.4, contours: 4, tone: 0.7, freq: 5.1, depth: 14, sway: 23, period: 31 },
-  { base: 1.05, amp: 0.34, seed: 37.9, contours: 5, tone: 0.92, freq: 6.3, depth: 22, sway: 33, period: 26 },
+  { base: 0.86, amp: 0.74, seed: 3.1, contours: 2, tone: 0.32, freq: 3.4, depth: 4, sway: 9, period: 47, distance: 1 },
+  { base: 0.92, amp: 0.6, seed: 11.7, contours: 3, tone: 0.5, freq: 4.2, depth: 8, sway: 15, period: 39, distance: 0.6 },
+  { base: 0.98, amp: 0.46, seed: 23.4, contours: 4, tone: 0.7, freq: 5.1, depth: 14, sway: 23, period: 31, distance: 0.15 },
+  { base: 1.05, amp: 0.34, seed: 37.9, contours: 5, tone: 0.92, freq: 6.3, depth: 22, sway: 33, period: 26, distance: 0 },
 ];
-const SIGNAL_RANGE = 2;
-const SIGNAL_MS = 17000;
-/** Share of the cycle spent travelling; the rest is a pause between passes. */
-const SIGNAL_TRAVEL = 0.66;
 const MIST_AFTER = 1;
+
+/** Ink, and ink with indigo mixed in, for each theme. */
+const INKS = {
+  light: { near: [26, 30, 38], far: [62, 84, 118] },
+  dark: { near: [206, 214, 226], far: [150, 172, 206] },
+};
+const mix = (a: number[], b: number[], t: number) => a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(', ');
 /** Extra canvas on each side, so swaying never exposes an edge. */
 const BLEED = 64;
 
@@ -87,10 +95,6 @@ export function initShanshui(root: HTMLElement) {
     return { range, layer, sway, canvas };
   });
 
-  const signal = document.createElement('span');
-  signal.className = 'ls-signal';
-  layers[SIGNAL_RANGE].sway.append(signal);
-  let signalMotion: Animation | undefined;
 
   /** On wide screens the land rises to the right; stacked layouts stay level. */
   const envelope = (u: number, w: number) => {
@@ -124,7 +128,8 @@ export function initShanshui(root: HTMLElement) {
 
     const c = canvas.getContext('2d')!;
     c.setTransform(dpr, 0, 0, dpr, 0, -offset * dpr);
-    const rgb = dark ? '206, 214, 226' : '26, 30, 38';
+    const ink = INKS[dark ? 'dark' : 'light'];
+    const rgb = mix(ink.near, ink.far, r.distance);
     const paper = dark ? '12, 14, 17' : '246, 247, 248';
 
     const trace = () => {
@@ -163,42 +168,12 @@ export function initShanshui(root: HTMLElement) {
       c.stroke();
     }
 
-    return { ys, step };
-  }
-
-  /**
-   * Sample the ridge into transform keyframes. `transform` and `opacity` are the two
-   * properties the compositor can run alone; `offset-path` would need the main thread
-   * for a style and paint pass on every frame.
-   */
-  function launchSignal(ys: Float32Array, step: number) {
-    signalMotion?.cancel();
-    if (still) return;
-    const frames: Keyframe[] = [];
-    const stride = 3;
-    const last = ys.length - 1 - ((ys.length - 1) % stride);
-    for (let i = 0; i <= last; i += stride) {
-      const next = Math.min(i + stride, last);
-      const angle = Math.atan2(ys[next] - ys[i], (next - i) * step || 1);
-      const u = i / last;
-      frames.push({
-        offset: u * SIGNAL_TRAVEL,
-        opacity: u < 0.08 ? u / 0.08 : u > 0.9 ? (1 - u) / 0.1 : 1,
-        transform: `translate3d(${(i * step - BLEED).toFixed(1)}px, ${ys[i].toFixed(1)}px, 0) rotate(${angle.toFixed(3)}rad)`,
-      });
-    }
-    const end = frames.at(-1)!;
-    frames.push({ offset: 1, opacity: 0, transform: end.transform });
-    signalMotion = signal.animate(frames, { duration: SIGNAL_MS, iterations: Infinity, easing: 'linear' });
   }
 
   function paint() {
     const rect = root.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    layers.forEach((entry, index) => {
-      const { ys, step } = paintRange(entry, rect.width, rect.height);
-      if (index === SIGNAL_RANGE) launchSignal(ys, step);
-    });
+    layers.forEach((entry) => paintRange(entry, rect.width, rect.height));
     root.classList.add('is-ready');
   }
 
@@ -220,8 +195,6 @@ export function initShanshui(root: HTMLElement) {
   // Compositor animations are cheap, but off screen they should cost nothing at all.
   new IntersectionObserver(([entry]) => {
     root.classList.toggle('is-paused', !entry.isIntersecting);
-    if (entry.isIntersecting) signalMotion?.play();
-    else signalMotion?.pause();
   }).observe(root);
 
   // Pointer parallax: a few transforms per frame, and only while the pointer moves.

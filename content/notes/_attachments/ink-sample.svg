@@ -1,16 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 680 240" role="img" aria-label="An ink landscape">
   <defs>
-    <linearGradient id="wash" x1="0" y1="0" x2="0" y2="1">
+    <linearGradient id="near" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#2a3038" stop-opacity=".55"/>
       <stop offset=".7" stop-color="#2a3038" stop-opacity="0"/>
     </linearGradient>
-    <radialGradient id="sun">
-      <stop offset="0" stop-color="#1f4fa8" stop-opacity=".85"/>
-      <stop offset="1" stop-color="#1f4fa8" stop-opacity="0"/>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4b607f" stop-opacity=".5"/>
+      <stop offset=".7" stop-color="#4b607f" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="500" cy="74" r="120" gradientUnits="userSpaceOnUse">
+      <stop offset=".32" stop-color="#4b607f" stop-opacity=".26"/>
+      <stop offset=".6" stop-color="#4b607f" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#4b607f" stop-opacity="0"/>
     </radialGradient>
+    <mask id="moon">
+      <rect width="680" height="240" fill="#fff"/>
+      <circle cx="500" cy="74" r="38" fill="#000"/>
+    </mask>
   </defs>
   <rect width="680" height="240" fill="#f3f4f6"/>
-  <circle cx="500" cy="74" r="46" fill="url(#sun)"/>
-  <path d="M0 150 90 96l58 40 80-66 74 58 62-30 96 62 70-40 150 56v64H0z" fill="url(#wash)" opacity=".5"/>
-  <path d="M0 190 120 132l70 44 92-52 104 66 86-42 208 62v30H0z" fill="url(#wash)"/>
+  <rect width="680" height="240" fill="url(#halo)" mask="url(#moon)"/>
+  <path d="M0 150 90 96l58 40 80-66 74 58 62-30 96 62 70-40 150 56v64H0z" fill="url(#far)"/>
+  <path d="M0 190 120 132l70 44 92-52 104 66 86-42 208 62v30H0z" fill="url(#near)"/>
 </svg>

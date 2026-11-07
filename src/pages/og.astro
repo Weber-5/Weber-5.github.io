@@ -28,12 +28,17 @@ const ranges = [0, 1, 2, 3].map((i) => ({
           <stop offset="0" stop-color="#11141a" stop-opacity="0.5"></stop>
           <stop offset="0.7" stop-color="#11141a" stop-opacity="0"></stop>
         </linearGradient>
-        <radialGradient id="sun">
-          <stop offset="0" stop-color="#1f4fa8" stop-opacity="0.5"></stop>
-          <stop offset="1" stop-color="#1f4fa8" stop-opacity="0"></stop>
+        <radialGradient id="halo" cx="930" cy="200" r="250" gradientUnits="userSpaceOnUse">
+          <stop offset="0.3" stop-color="#4b607f" stop-opacity="0.24"></stop>
+          <stop offset="0.55" stop-color="#4b607f" stop-opacity="0.1"></stop>
+          <stop offset="1" stop-color="#4b607f" stop-opacity="0"></stop>
         </radialGradient>
+        <mask id="moon">
+          <rect width="1200" height="630" fill="#fff"></rect>
+          <circle cx="930" cy="200" r="75" fill="#000"></circle>
+        </mask>
       </defs>
-      <circle cx="940" cy="230" r="170" fill="url(#sun)"></circle>
+      <rect width="1200" height="630" fill="url(#halo)" mask="url(#moon)"></rect>
       {ranges.map((r) => (
         <g>
           <path d={areaPath(r.points, 630)} fill="url(#wash)" opacity={r.tone}></path>
@@ -53,7 +58,7 @@ const ranges = [0, 1, 2, 3].map((i) => ({
   html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: #f6f7f8; }
   svg { position: absolute; inset: 0; width: 1200px; height: 630px; }
   main { position: relative; padding: 76px 84px; color: #11141a; }
-  .eyebrow { margin: 0; font: 500 19px 'JetBrains Mono Variable', monospace; letter-spacing: 0.02em; color: #1f4fa8; }
+  .eyebrow { margin: 0; font: 500 19px 'JetBrains Mono Variable', monospace; letter-spacing: 0.02em; color: #616a76; }
   h1 { margin: 22px 0 0 -6px; font: 600 148px/1 'Manrope Variable', sans-serif; letter-spacing: -0.055em; }
   .role { margin: 22px 0 0; font: 500 32px 'Manrope Variable', sans-serif; letter-spacing: -0.015em; color: #3f4650; }
 </style>

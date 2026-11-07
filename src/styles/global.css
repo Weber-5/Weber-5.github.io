@@ -22,11 +22,21 @@
   --line: light-dark(rgb(17 20 26 / 0.09), rgb(236 238 241 / 0.09));
   --line-2: light-dark(rgb(17 20 26 / 0.18), rgb(236 238 241 / 0.18));
 
-  /* Academic blue: the single dab of colour */
-  --blue: light-dark(#1f4fa8, #8db2f2);
-  --blue-deep: light-dark(#14315f, #b9cff5);
-  --blue-wash: light-dark(rgb(31 79 168 / 0.07), rgb(141 178 242 / 0.1));
-  --blue-glow: light-dark(rgb(31 79 168 / 0.16), rgb(141 178 242 / 0.2));
+  /*
+   * 花青, indigo: the one colour on the site, with exactly two jobs.
+   *   In the interface it means "you can act on this" or "you are here":
+   *   links, focus, selection, progress, the current item, and your own work
+   *   in the graph. It is never decoration.
+   *   In pictures it is the tint of distance, mixed into the ink the way ink
+   *   painting greys far hills with indigo. Near things stay plain ink.
+   */
+  --blue: light-dark(#2e4e7e, #9db4d8);
+  --blue-deep: light-dark(#1e3557, #c3d2ea);
+  --blue-wash: light-dark(rgb(46 78 126 / 0.07), rgb(157 180 216 / 0.1));
+  --blue-glow: light-dark(rgb(46 78 126 / 0.14), rgb(157 180 216 / 0.18));
+  /* Indigo mixed into ink, for whatever is far away */
+  --ink-far: light-dark(#4b607f, #93a7c4);
+  --haze: light-dark(rgb(52 74 108 / 0.05), rgb(150 172 205 / 0.045));
 
   --glass: light-dark(rgb(255 255 255 / 0.68), rgb(20 23 28 / 0.62));
   --glass-strong: light-dark(rgb(255 255 255 / 0.84), rgb(20 23 28 / 0.84));
@@ -186,7 +196,7 @@ p { text-wrap: pretty; }
   inset: 0 0 -60px;
   z-index: -1;
   background:
-    radial-gradient(60% 90% at 88% 0%, var(--blue-wash), transparent 70%),
+    radial-gradient(60% 90% at 88% 0%, var(--haze), transparent 70%),
     radial-gradient(50% 70% at 10% 0%, light-dark(rgb(17 20 26 / 0.035), rgb(236 238 241 / 0.03)), transparent 70%);
   pointer-events: none;
 }
@@ -387,21 +397,6 @@ a.chip:hover { color: var(--blue); border-color: var(--blue); background: var(--
   to { transform: translate3d(9%, 3%, 0); }
 }
 
-.ls-signal {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 30px;
-  height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--blue));
-  box-shadow: 8px 0 10px 1px var(--blue-glow);
-  transform-origin: 100% 50%;
-  margin-left: -30px;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
 .landscape.is-paused * { animation-play-state: paused; }
 
 /* --- Page transitions: native cross-document view transitions --------------- */
@@ -441,7 +436,7 @@ html.theme-switching *::after { transition: none !important; }
     scroll-behavior: auto !important;
   }
   .js [data-reveal] { opacity: 1; transform: none; }
-  .ls-signal, .ls-mist, .ink-drop { display: none; }
+  .ls-mist, .ink-drop { display: none; }
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }

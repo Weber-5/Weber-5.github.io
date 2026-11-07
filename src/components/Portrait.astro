@@ -11,16 +11,22 @@ interface Props {
 const { src, alt, caption, coordinates } = Astro.props;
 
 /*
- * With no photo set, the arch frames an ink landscape instead: ranges deepening
- * toward the viewer with mist between them, and one dab of blue for the moon.
+ * With no photo set, the arch frames an ink landscape instead.
+ *
+ * The moon is not painted. Following the old technique of 烘云托月 ("wash the
+ * clouds to hold up the moon"), the sky is washed with ink and the moon is the
+ * paper left untouched, its edge darkest where the wash meets it. Distant ranges
+ * carry indigo mixed into the ink, as far hills do in ink painting; near ranges
+ * are plain ink. There is no colour that is only decoration.
  */
+const MOON = { x: 262, y: 148, r: 50 };
 const rand = rng('moon-gate-3');
 const ranges = [
-  { base: 268, amp: 30, tone: 0.2, line: 0.16 },
-  { base: 318, amp: 36, tone: 0.34, line: 0.24 },
-  { base: 372, amp: 40, tone: 0.52, line: 0.34 },
-  { base: 428, amp: 40, tone: 0.76, line: 0.5 },
-  { base: 482, amp: 34, tone: 1, line: 0.7 },
+  { base: 268, amp: 30, tone: 0.24, line: 0.2, far: true },
+  { base: 318, amp: 36, tone: 0.36, line: 0.26, far: true },
+  { base: 372, amp: 40, tone: 0.52, line: 0.34, far: false },
+  { base: 428, amp: 40, tone: 0.76, line: 0.5, far: false },
+  { base: 482, amp: 34, tone: 1, line: 0.7, far: false },
 ].map((r) => ({ ...r, points: ridge(rand, { width: 400, base: r.base, amp: r.amp, steps: 84, octaves: 5, sharp: true }) }));
 ---
 
@@ -32,28 +38,49 @@ const ranges = [
       ) : (
         <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" role="img" aria-label={caption}>
           <defs>
+            <linearGradient id="p-sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--ink-far)" stop-opacity="0.11"></stop>
+              <stop offset="0.45" stop-color="var(--ink-far)" stop-opacity="0.035"></stop>
+              <stop offset="0.7" stop-color="var(--ink-far)" stop-opacity="0"></stop>
+            </linearGradient>
+            <radialGradient id="p-halo" cx={MOON.x} cy={MOON.y} r="175" gradientUnits="userSpaceOnUse">
+              <stop offset={MOON.r / 175} stop-color="var(--ink-far)" stop-opacity="0.15"></stop>
+              <stop offset="0.42" stop-color="var(--ink-far)" stop-opacity="0.075"></stop>
+              <stop offset="0.7" stop-color="var(--ink-far)" stop-opacity="0.02"></stop>
+              <stop offset="1" stop-color="var(--ink-far)" stop-opacity="0"></stop>
+            </radialGradient>
             <linearGradient id="p-wash" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stop-color="var(--ink)" stop-opacity="0.62"></stop>
               <stop offset="0.3" stop-color="var(--ink)" stop-opacity="0.2"></stop>
               <stop offset="0.72" stop-color="var(--ink)" stop-opacity="0"></stop>
             </linearGradient>
-            <radialGradient id="p-moon">
-              <stop offset="0" stop-color="var(--blue)" stop-opacity="0.92"></stop>
-              <stop offset="0.5" stop-color="var(--blue)" stop-opacity="0.72"></stop>
-              <stop offset="0.72" stop-color="var(--blue)" stop-opacity="0.2"></stop>
-              <stop offset="1" stop-color="var(--blue)" stop-opacity="0"></stop>
-            </radialGradient>
-            <filter id="p-bleed" x="-30%" y="-30%" width="160%" height="160%">
-              <feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="8"></feTurbulence>
-              <feDisplacementMap in="SourceGraphic" scale="11"></feDisplacementMap>
+            <linearGradient id="p-wash-far" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="var(--ink-far)" stop-opacity="0.62"></stop>
+              <stop offset="0.3" stop-color="var(--ink-far)" stop-opacity="0.2"></stop>
+              <stop offset="0.72" stop-color="var(--ink-far)" stop-opacity="0"></stop>
+            </linearGradient>
+            <filter id="p-edge" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="1.6"></feGaussianBlur>
             </filter>
+            <mask id="p-moon" maskUnits="userSpaceOnUse" x="0" y="0" width="400" height="500">
+              <rect width="400" height="500" fill="#fff"></rect>
+              <circle cx={MOON.x} cy={MOON.y} r={MOON.r} fill="#000" filter="url(#p-edge)"></circle>
+            </mask>
           </defs>
-          <circle cx="262" cy="150" r="66" fill="url(#p-moon)" filter="url(#p-bleed)"></circle>
+
+          <!-- The wash, with the moon left as paper. -->
+          <g mask="url(#p-moon)">
+            <rect width="400" height="500" fill="url(#p-sky)"></rect>
+            <rect width="400" height="500" fill="url(#p-halo)"></rect>
+          </g>
+          <!-- At night the paper is dark, so the moon is lit instead of left blank. -->
+          <circle class="moon" cx={MOON.x} cy={MOON.y} r={MOON.r} filter="url(#p-edge)"></circle>
+
           {ranges.map((r) => (
             <g>
-              <path d={areaPath(r.points, 500)} fill="var(--surface-2)" opacity={0.55}></path>
-              <path d={areaPath(r.points, 500)} fill="url(#p-wash)" opacity={r.tone}></path>
-              <path d={linePath(r.points)} fill="none" stroke="var(--ink)" stroke-opacity={r.line} stroke-width="0.9"></path>
+              <path d={areaPath(r.points, 500)} fill="var(--surface-2)" opacity="0.55"></path>
+              <path d={areaPath(r.points, 500)} fill={r.far ? 'url(#p-wash-far)' : 'url(#p-wash)'} opacity={r.tone}></path>
+              <path d={linePath(r.points)} fill="none" stroke={r.far ? 'var(--ink-far)' : 'var(--ink)'} stroke-opacity={r.line} stroke-width="0.9"></path>
             </g>
           ))}
         </svg>
@@ -63,7 +90,6 @@ const ranges = [
       <path d="M-10 500V200a210 210 0 0 1 420 0v300" stroke="var(--line-2)" vector-effect="non-scaling-stroke"></path>
       <path d="M-30 500h20M410 500h20" stroke="var(--ink-4)" vector-effect="non-scaling-stroke"></path>
     </svg>
-    {src && <span class="dab" aria-hidden="true"></span>}
   </div>
   <figcaption class="label">
     <span>{caption}</span>
@@ -91,6 +117,8 @@ const ranges = [
     box-shadow: inset 0 0 0 1px var(--line), var(--shadow-3);
   }
   .gate img, .gate svg { width: 100%; height: 100%; object-fit: cover; }
+  /* By day the moon is untouched paper; at night it is the one lit thing. */
+  .moon { fill: light-dark(transparent, rgb(214 221 232 / 0.8)); }
   .frame {
     position: absolute;
     inset: 0;
@@ -98,16 +126,6 @@ const ranges = [
     height: 100%;
     overflow: visible;
     pointer-events: none;
-  }
-  .dab {
-    position: absolute;
-    top: 7%;
-    right: -2%;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    background: var(--blue);
-    box-shadow: 0 0 0 6px var(--blue-wash), 0 0 26px 6px var(--blue-glow);
   }
   figcaption {
     display: flex;

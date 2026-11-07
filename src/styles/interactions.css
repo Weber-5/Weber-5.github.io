@@ -101,13 +101,6 @@ html { -webkit-tap-highlight-color: transparent; }
   pointer-events: none;
   transition: opacity 220ms var(--ease), transform 360ms var(--ease);
 }
-.toast::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--blue);
-}
 .toast.is-on { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
 /* --- Back to top, with a ring that fills as you read ------------------------ */

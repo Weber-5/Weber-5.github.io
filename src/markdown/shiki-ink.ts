@@ -2,8 +2,8 @@
 export function inkTheme(mode: 'light' | 'dark') {
   const c =
     mode === 'light'
-      ? { fg: '#262B33', dim: '#6E7886', soft: '#4B5563', blue: '#1F4FA8', deep: '#14315F', str: '#34607F' }
-      : { fg: '#D9DEE5', dim: '#87919E', soft: '#A9B2BE', blue: '#8DB2F2', deep: '#B9CFF5', str: '#9CC0D6' };
+      ? { fg: '#262B33', dim: '#6E7886', soft: '#4B5563', blue: '#2E4E7E', deep: '#1E3557', str: '#46607C' }
+      : { fg: '#D9DEE5', dim: '#87919E', soft: '#A9B2BE', blue: '#9DB4D8', deep: '#C3D2EA', str: '#A9BCCB' };
   return {
     name: `ink-${mode}`,
     type: mode,
