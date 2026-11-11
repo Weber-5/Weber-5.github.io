@@ -1,0 +1,115 @@
+---
+/**
+ * Stand-in artwork for the gallery until real photographs are added: a night sky
+ * or an ink landscape, generated from a seed. Always labelled as a placeholder.
+ */
+import { rng, ridge, areaPath, linePath } from '../lib/ink';
+
+interface Props {
+  seed: string;
+  kind: 'milkyway' | 'deepsky' | 'trails' | 'landscape';
+  aspect: number;
+}
+
+const { seed, kind, aspect } = Astro.props;
+const rand = rng(seed);
+const W = 600;
+const H = Math.round(W / aspect);
+const uid = seed.replace(/[^a-z0-9]/gi, '');
+const night = kind !== 'landscape';
+
+const stars = night
+  ? Array.from({ length: kind === 'deepsky' ? 260 : 340 }, () => {
+      const big = rand() > 0.96;
+      return { x: rand() * W, y: rand() * H * (kind === 'deepsky' ? 1 : 0.86), r: big ? 0.9 + rand() * 0.8 : 0.25 + rand() * 0.55, o: 0.35 + rand() * 0.65 };
+    })
+  : [];
+
+// Star trails: arcs around a pole a little outside the frame.
+const pole = { x: W * (0.55 + rand() * 0.2), y: -H * 0.05 };
+const trails =
+  kind === 'trails'
+    ? Array.from({ length: 120 }, () => {
+        const r = 20 + rand() * Math.hypot(W, H) * 0.95;
+        const a0 = rand() * Math.PI * 2;
+        const a1 = a0 + 0.45 + rand() * 0.2;
+        const p = (a: number) => `${(pole.x + Math.cos(a) * r).toFixed(1)} ${(pole.y + Math.sin(a) * r).toFixed(1)}`;
+        return { d: `M${p(a0)}A${r.toFixed(1)} ${r.toFixed(1)} 0 0 1 ${p(a1)}`, o: 0.12 + rand() * 0.5, w: 0.5 + rand() * 0.8 };
+      })
+    : [];
+
+const horizon = ridge(rand, { width: W, base: H * 0.9, amp: H * 0.06, steps: 64, octaves: 4, sharp: true });
+const bandAngle = -28 - rand() * 30;
+const galaxyAngle = rand() * 180;
+
+const ranges = [0, 1, 2, 3].map((i) => ({
+  points: ridge(rand, { width: W, base: H * (0.48 + i * 0.13), amp: H * 0.07, steps: 60, octaves: 5, sharp: true }),
+  tone: 0.16 + i * 0.2,
+}));
+---
+
+<svg class="ph-art" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs>
+    <linearGradient id={`sky-${uid}`} x1="0" y1="0" x2="0" y2="1">
+      {night ? (
+        <>
+          <stop offset="0" stop-color="#05070b"></stop>
+          <stop offset="1" stop-color="#151b25"></stop>
+        </>
+      ) : (
+        <>
+          <stop offset="0" stop-color="#e9ebee"></stop>
+          <stop offset="1" stop-color="#f6f7f8"></stop>
+        </>
+      )}
+    </linearGradient>
+    <filter id={`soft-${uid}`} x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation={kind === 'deepsky' ? 6 : 16}></feGaussianBlur>
+    </filter>
+    <radialGradient id={`core-${uid}`}>
+      <stop offset="0" stop-color="#e8ecf2" stop-opacity="0.9"></stop>
+      <stop offset="0.25" stop-color="#b6c3d6" stop-opacity="0.35"></stop>
+      <stop offset="1" stop-color="#93a7c4" stop-opacity="0"></stop>
+    </radialGradient>
+    <linearGradient id={`wash-${uid}`} x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1a1e26" stop-opacity="0.55"></stop>
+      <stop offset="0.75" stop-color="#1a1e26" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+  <rect width={W} height={H} fill={`url(#sky-${uid})`}></rect>
+
+  {kind === 'milkyway' && (
+    <g transform={`rotate(${bandAngle} ${W / 2} ${H / 2})`} filter={`url(#soft-${uid})`}>
+      <ellipse cx={W / 2} cy={H / 2} rx={W * 0.9} ry={H * 0.13} fill="#93a7c4" opacity="0.2"></ellipse>
+      <ellipse cx={W * 0.56} cy={H / 2} rx={W * 0.32} ry={H * 0.08} fill="#d8dee8" opacity="0.18"></ellipse>
+      <ellipse cx={W * 0.5} cy={H / 2 + 6} rx={W * 0.6} ry={H * 0.025} fill="#05070b" opacity="0.55"></ellipse>
+    </g>
+  )}
+
+  {kind === 'deepsky' && (
+    <g transform={`rotate(${galaxyAngle} ${W / 2} ${H / 2})`}>
+      <ellipse cx={W / 2} cy={H / 2} rx={W * 0.3} ry={W * 0.09} fill={`url(#core-${uid})`} filter={`url(#soft-${uid})`}></ellipse>
+      <ellipse cx={W / 2} cy={H / 2} rx={W * 0.05} ry={W * 0.022} fill="#eef1f6" opacity="0.8" filter={`url(#soft-${uid})`}></ellipse>
+    </g>
+  )}
+
+  {trails.map((t) => (
+    <path d={t.d} fill="none" stroke="#dfe5ee" stroke-opacity={t.o} stroke-width={t.w} stroke-linecap="round"></path>
+  ))}
+
+  {stars.map((s) => <circle cx={s.x.toFixed(1)} cy={s.y.toFixed(1)} r={s.r.toFixed(2)} fill="#eef2f8" opacity={s.o.toFixed(2)}></circle>)}
+
+  {(kind === 'milkyway' || kind === 'trails') && <path d={areaPath(horizon, H)} fill="#020305"></path>}
+
+  {kind === 'landscape' && ranges.map((r) => (
+    <g>
+      <path d={areaPath(r.points, H)} fill="#f6f7f8" opacity="0.5"></path>
+      <path d={areaPath(r.points, H)} fill={`url(#wash-${uid})`} opacity={r.tone}></path>
+      <path d={linePath(r.points)} fill="none" stroke="#1a1e26" stroke-opacity={r.tone * 0.8}></path>
+    </g>
+  ))}
+</svg>
+
+<style>
+  .ph-art { width: 100%; height: 100%; display: block; }
+</style>

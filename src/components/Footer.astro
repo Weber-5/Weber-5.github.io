@@ -23,6 +23,7 @@ const site = [
   { path: '/projects/', label: t('nav.projects') },
   { path: '/graph/', label: t('nav.graph') },
   { path: '/notes/', label: t('nav.notes') },
+  { path: '/photography/', label: t('nav.photos') },
   { path: '/cv/', label: t('nav.cv') },
 ];
 const elsewhere = [
@@ -30,6 +31,9 @@ const elsewhere = [
   { url: profile.links.scholar, label: 'Google Scholar' },
   { url: profile.links.orcid, label: 'ORCID' },
   { url: profile.links.linkedin, label: 'LinkedIn' },
+  { url: profile.links.px500, label: '500px' },
+  { url: profile.links.bilibili, label: lang === 'zh' ? '哔哩哔哩' : 'Bilibili' },
+  { url: profile.links.zhihu, label: lang === 'zh' ? '知乎' : 'Zhihu' },
 ].filter((l) => l.url);
 const built = new Date().toISOString().slice(0, 10);
 ---

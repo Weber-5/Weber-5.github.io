@@ -1,0 +1,86 @@
+# Photography.
+#
+# Put image files in content/photos/ and they appear on the site automatically,
+# with camera settings read from EXIF. Add an entry here only to say more:
+#
+# - file: andromeda.jpg
+#   title: { en: Andromeda Galaxy, zh: 仙女座星系 }
+#   category: astro            # astro, landscape, city, nature, people, ...
+#   date: 2026-08-12
+#   location: { en: Mount Wugong, zh: 武功山 }
+#   caption: { en: One sentence about the night., zh: 关于这一夜的一句话。 }
+#   featured: true             # show on the home page
+#   gear: { lens: Samyang 14mm f/2.8 }   # fills or corrects EXIF
+#   astro:
+#     target: { en: M31, zh: M31 仙女座星系 }
+#     telescope: RedCat 51
+#     camera: ZWO ASI2600MC
+#     mount: Star Adventurer GTi
+#     filters: L-eXtreme
+#     exposure: 120 × 180 s
+#     integration: 6 h
+#     bortle: 4
+#
+# The entries below are placeholders. They disappear by themselves as soon as
+# the first real photograph is added, so there is nothing to delete.
+
+- placeholder: true
+  kind: milkyway
+  aspect: 1.5
+  category: astro
+  featured: true
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  astro: { target: { en: Milky Way core, zh: 银河核心 }, exposure: 20 × 15 s, integration: 5 min, bortle: '3' }
+- placeholder: true
+  kind: landscape
+  aspect: 1.5
+  category: landscape
+  featured: true
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  gear: { focal: 70 mm, aperture: f/8, shutter: 1/125 s, iso: ISO 100 }
+- placeholder: true
+  kind: deepsky
+  aspect: 1
+  category: astro
+  featured: true
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  astro: { target: { en: Deep-sky target, zh: 深空目标 }, exposure: 120 × 180 s, integration: 6 h, bortle: '4' }
+- placeholder: true
+  kind: landscape
+  aspect: 0.75
+  category: landscape
+  featured: true
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  gear: { focal: 35 mm, aperture: f/11, shutter: 1/60 s, iso: ISO 100 }
+- placeholder: true
+  kind: trails
+  aspect: 1.5
+  category: astro
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  astro: { target: { en: Star trails, zh: 星轨 }, exposure: 240 × 30 s, integration: 2 h, bortle: '5' }
+- placeholder: true
+  kind: landscape
+  aspect: 1.78
+  category: landscape
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  gear: { focal: 24 mm, aperture: f/8, shutter: 1/200 s, iso: ISO 100 }
+- placeholder: true
+  kind: milkyway
+  aspect: 0.67
+  category: astro
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  astro: { target: { en: Milky Way, zh: 银河 }, exposure: 12 × 20 s, integration: 4 min, bortle: '2' }
+- placeholder: true
+  kind: deepsky
+  aspect: 1.5
+  category: astro
+  title: { en: Photo title, zh: 照片标题 }
+  location: { en: Location, zh: 拍摄地点 }
+  astro: { target: { en: Deep-sky target, zh: 深空目标 }, exposure: 90 × 300 s, integration: 7.5 h, bortle: '4' }

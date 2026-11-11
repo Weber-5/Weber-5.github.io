@@ -32,6 +32,7 @@ with a message pointing at the exact field instead of shipping a broken page.
 | `content/cv.yaml` | Education, positions, awards, skills |
 | `content/projects/*.md` | One file per project. `featured: true` puts it on the home page |
 | `content/domains.yaml` | The knowledge taxonomy: categories and fields |
+| `content/photos/` + `photos.yaml` | Photography: drop images in; the YAML adds titles and astro details |
 | `content/notes/` | The notes vault |
 
 Text fields take a plain string, or `{ en: ..., zh: ... }` for two languages.
@@ -41,6 +42,20 @@ Everything still unwritten carries `placeholder: true`, which shows a dashed
 
 **Portrait:** put a photo in `public/images/` and set `portrait: /images/portrait.jpg`
 in `profile.yaml`. A 4:5 crop works best.
+
+## Photography
+
+Drop JPEG, PNG, WebP or AVIF files into `content/photos/` and push. The build reads
+each photo's EXIF for camera, lens and exposure, renders responsive WebP sizes, and
+samples a tone to show while it loads. The placeholders vanish with the first real photo.
+
+Only the generated WebP files are published, and they carry no metadata: GPS
+coordinates in an original never reach the site.
+
+To say more than EXIF can, add an entry to `content/photos.yaml` with the same `file`
+name: title, `category` (`astro`, `landscape`, ...), place, caption, `featured: true`
+for the home page, and for astrophotography the target, telescope, mount, filters,
+sub-exposures, total integration and Bortle class. The file has a full example.
 
 ## Notes and the knowledge graph
 

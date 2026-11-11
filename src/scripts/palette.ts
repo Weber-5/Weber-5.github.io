@@ -16,6 +16,7 @@ const PAGES: Item[] = [
   { type: 'page', title: { en: 'Projects', zh: '开源项目' }, url: '/projects/' },
   { type: 'page', title: { en: 'Knowledge Graph', zh: '知识图谱' }, url: '/graph/' },
   { type: 'page', title: { en: 'Notes', zh: '学习笔记' }, url: '/notes/' },
+  { type: 'page', title: { en: 'Photography', zh: '摄影' }, url: '/photography/' },
   { type: 'page', title: { en: 'CV', zh: '简历' }, url: '/cv/' },
 ];
 

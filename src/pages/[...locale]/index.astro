@@ -7,6 +7,8 @@ import SectionHead from '../../components/SectionHead.astro';
 import PublicationRow from '../../components/PublicationRow.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import NoteRow from '../../components/NoteRow.astro';
+import PhotoTile from '../../components/PhotoTile.astro';
+import { getPhotos } from '../../lib/photos';
 import { href, localeParams, tr, useT, type Lang } from '../../i18n';
 import { getProfile, getPublications } from '../../lib/data';
 import { buildGraph, graphStats } from '../../lib/graph';
@@ -27,6 +29,8 @@ const projects = (await getCollection('projects'))
 const graph = await buildGraph();
 const stats = graphStats(graph);
 const recent = getVault().notes.slice(0, 4);
+const allPhotos = await getPhotos();
+const featuredPhotos = (allPhotos.some((p) => p.featured) ? allPhotos.filter((p) => p.featured) : allPhotos).slice(0, 4);
 
 const crumbOf = (domain: string, field?: string) => {
   const d = graph.domains.find((x) => x.id === domain);
@@ -186,6 +190,21 @@ const jsonLd = {
       ))}
     </ul>
   </section>
+
+  {featuredPhotos.length > 0 && (
+    <section class="section wrap">
+      <SectionHead
+        index="05"
+        title={t('home.photos')}
+        link={{ href: href('/photography/', lang), label: t('home.photos.all') }}
+      />
+      <div class="photo-strip">
+        {featuredPhotos.map((photo, i) => (
+          <PhotoTile photo={photo} lang={lang} i={i} link sizes="(max-width: 640px) 100vw, 25vw" />
+        ))}
+      </div>
+    </section>
+  )}
 </Base>
 
 <script>
@@ -417,6 +436,9 @@ const jsonLd = {
 
   .notes-block { padding-top: var(--section); }
   .note-list { border-bottom: 1px solid var(--line); }
+  .photo-strip { --row: 210px; display: flex; flex-wrap: wrap; gap: 10px; }
+  /* One row only: let the photos fill it edge to edge. */
+  @media (max-width: 640px) { .photo-strip { --row: 140px; gap: 6px; } }
 
   @media (max-width: 980px) {
     .project-grid { grid-template-columns: 1fr 1fr; }

@@ -1,0 +1,142 @@
+---
+import PhotoPlaceholder from './PhotoPlaceholder.astro';
+import { formatDate, href, tr, useT, type Lang, type UiKey } from '../i18n';
+import type { Photo } from '../lib/photos';
+
+interface Props {
+  photo: Photo;
+  lang: Lang;
+  i?: number;
+  /** On the home page a tile leads to the gallery instead of opening the viewer. */
+  link?: boolean;
+  sizes?: string;
+}
+
+const { photo: p, lang, i = 0, link = false, sizes = '(max-width: 640px) 100vw, (max-width: 1100px) 50vw, 33vw' } = Astro.props;
+const t = useT(lang);
+const title = tr(p.title, lang);
+const isAstro = p.category === 'astro' || !!p.astro;
+
+/** One quiet line under the title: what a photographer would want to know first. */
+const line = isAstro
+  ? [tr(p.astro?.target, lang), p.astro?.integration, p.astro?.bortle && `Bortle ${p.astro.bortle}`].filter(Boolean).join(' · ')
+  : [p.gear.focal, p.gear.aperture, p.gear.shutter, p.gear.iso].filter(Boolean).join(' · ');
+
+const row = (key: UiKey, value?: string) => (value ? [t(key), value] : null);
+const rows = (
+  isAstro
+    ? [
+        row('photos.target', tr(p.astro?.target, lang)),
+        row('photos.telescope', p.astro?.telescope),
+        row('photos.camera', p.astro?.camera ?? p.gear.camera),
+        row('photos.mount', p.astro?.mount),
+        row('photos.filters', p.astro?.filters),
+        row('photos.exposure', p.astro?.exposure ?? [p.gear.focal, p.gear.aperture, p.gear.shutter, p.gear.iso].filter(Boolean).join(' · ')),
+        row('photos.integration', p.astro?.integration),
+        row('photos.bortle', p.astro?.bortle),
+      ]
+    : [
+        row('photos.camera', p.gear.camera),
+        row('photos.lens', p.gear.lens),
+        row('photos.settings', [p.gear.focal, p.gear.aperture, p.gear.shutter, p.gear.iso].filter(Boolean).join(' · ')),
+      ]
+).filter(Boolean);
+
+const meta = {
+  id: p.id,
+  title,
+  place: [tr(p.location, lang), p.date && formatDate(p.date, lang)].filter(Boolean).join(' · '),
+  caption: tr(p.caption, lang),
+  full: p.full,
+  rows,
+  placeholder: p.placeholder,
+};
+const target = href(`/photography/#photo=${encodeURIComponent(p.id)}`, lang);
+---
+
+<figure
+  class:list={['tile', { dark: p.placeholder && p.kind !== 'landscape' }]}
+  data-photo={p.id}
+  data-category={p.category}
+  data-meta={link ? undefined : JSON.stringify(meta)}
+  data-reveal
+  style={`--r:${p.aspect.toFixed(3)};--tone:${p.tone};--i:${Math.min(i, 8)}`}
+>
+  {link ? (
+    <a class="open" href={target} aria-label={title}>
+      <span class="media">
+        {p.thumb ? (
+          <img src={p.thumb.src} srcset={p.thumb.srcset} sizes={sizes} alt={title} width={p.thumb.width} height={p.thumb.height} loading="lazy" decoding="async" />
+        ) : (
+          <PhotoPlaceholder seed={p.id} kind={p.kind ?? 'landscape'} aspect={p.aspect} />
+        )}
+      </span>
+    </a>
+  ) : (
+    <button class="open" type="button" aria-label={`${title}. ${t('photos.view')}`}>
+      <span class="media">
+        {p.thumb ? (
+          <img src={p.thumb.src} srcset={p.thumb.srcset} sizes={sizes} alt={title} width={p.thumb.width} height={p.thumb.height} loading="lazy" decoding="async" />
+        ) : (
+          <PhotoPlaceholder seed={p.id} kind={p.kind ?? 'landscape'} aspect={p.aspect} />
+        )}
+      </span>
+    </button>
+  )}
+  <figcaption>
+    <span class="title">{title}</span>
+    {line && <span class="line">{line}</span>}
+  </figcaption>
+  {p.placeholder && <span class="chip chip-ph flag">{t('placeholder.chip')}</span>}
+</figure>
+
+<style>
+  /* Justified rows: each tile grows in proportion to its aspect ratio, so every
+     photograph is shown whole, uncropped, and rows come out flush. */
+  .tile {
+    position: relative;
+    flex: var(--r) 1 calc(var(--r) * var(--row, 240px));
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--tone);
+  }
+  .open { display: block; width: 100%; cursor: zoom-in; }
+  .media { display: block; aspect-ratio: var(--r); overflow: hidden; }
+  .media img, .media :global(svg) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 900ms var(--ease), opacity 600ms var(--ease);
+  }
+  figcaption {
+    position: absolute;
+    inset: auto 0 0;
+    display: grid;
+    gap: 2px;
+    padding: 36px 14px 12px;
+    background: linear-gradient(transparent, rgb(6 8 11 / 0.72));
+    color: #eef1f5;
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity var(--t-med) var(--ease), transform var(--t-med) var(--ease);
+  }
+  .title { font-family: var(--font-display); font-size: var(--fs-sm); font-weight: 600; }
+  .line { font-family: var(--font-mono); font-size: 0.6875rem; opacity: 0.78; }
+  @media (hover: hover) {
+    .tile:hover figcaption, .tile:focus-within figcaption { opacity: 1; transform: none; }
+    .tile:hover .media img, .tile:hover .media :global(svg) { transform: scale(1.025); }
+  }
+  .flag {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgb(255 255 255 / 0.75);
+    color: #3f4650;
+  }
+  .dark .flag { background: rgb(12 14 17 / 0.6); color: #c9d0da; border-color: rgb(255 255 255 / 0.2); }
+  .open:focus-visible { outline-offset: -3px; }
+</style>

@@ -30,6 +30,9 @@ const profileSchema = z.object({
       email: z.string().default(''),
       orcid: z.string().default(''),
       linkedin: z.string().default(''),
+      px500: z.string().default(''),
+      bilibili: z.string().default(''),
+      zhihu: z.string().default(''),
     })
     .prefault({}),
   interests: z.array(z.object({ title: localized, note: localized.optional() })).default([]),

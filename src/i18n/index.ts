@@ -35,6 +35,7 @@ const en = {
   'nav.graph': 'Graph',
   'nav.notes': 'Notes',
   'nav.cv': 'CV',
+  'nav.photos': 'Photography',
   'nav.menu': 'Menu',
   'nav.primary': 'Primary',
   'a11y.skip': 'Skip to content',
@@ -189,6 +190,25 @@ const en = {
   'palette.project': 'Project',
 
   'placeholder.chip': 'Placeholder',
+  'photos.title': 'Photography',
+  'photos.lead': 'Landscapes by day, the night sky after dark.',
+  'photos.more': 'More on 500px',
+  'photos.view': 'View larger',
+  'photos.of': 'of',
+  'photos.prev': 'Previous photograph',
+  'photos.next': 'Next photograph',
+  'photos.target': 'Target',
+  'photos.telescope': 'Telescope',
+  'photos.camera': 'Camera',
+  'photos.mount': 'Mount',
+  'photos.filters': 'Filters',
+  'photos.exposure': 'Exposure',
+  'photos.integration': 'Integration',
+  'photos.bortle': 'Bortle',
+  'photos.lens': 'Lens',
+  'photos.settings': 'Settings',
+  'home.photos': 'Photography',
+  'home.photos.all': 'All photographs',
   '404.title': 'This page has not been written yet',
   '404.lead': 'Like an unwritten note in the graph, this link points somewhere that does not exist yet.',
   '404.home': 'Back home',
@@ -204,6 +224,7 @@ const zh: Record<UiKey, string> = {
   'nav.graph': '图谱',
   'nav.notes': '笔记',
   'nav.cv': '简历',
+  'nav.photos': '摄影',
   'nav.menu': '菜单',
   'nav.primary': '主导航',
   'a11y.skip': '跳到正文',
@@ -358,6 +379,25 @@ const zh: Record<UiKey, string> = {
   'palette.project': '项目',
 
   'placeholder.chip': '占位',
+  'photos.title': '摄影',
+  'photos.lead': '白天拍山河，入夜拍星空。',
+  'photos.more': '在 500px 查看更多',
+  'photos.view': '查看大图',
+  'photos.of': '/',
+  'photos.prev': '上一张',
+  'photos.next': '下一张',
+  'photos.target': '目标',
+  'photos.telescope': '望远镜',
+  'photos.camera': '相机',
+  'photos.mount': '赤道仪',
+  'photos.filters': '滤镜',
+  'photos.exposure': '曝光',
+  'photos.integration': '总曝光',
+  'photos.bortle': '波特尔等级',
+  'photos.lens': '镜头',
+  'photos.settings': '参数',
+  'home.photos': '摄影',
+  'home.photos.all': '全部作品',
   '404.title': '这一页还没有被写下',
   '404.lead': '就像图谱中尚未落笔的节点，这个链接指向的内容还不存在。',
   '404.home': '返回首页',
@@ -367,6 +407,19 @@ const zh: Record<UiKey, string> = {
 const dict = { en, zh } as const;
 
 export const useT = (lang: Lang) => (key: UiKey) => dict[lang][key] as string;
+
+const CATEGORIES: Record<string, { en: string; zh: string }> = {
+  astro: { en: 'Astrophotography', zh: '天文摄影' },
+  landscape: { en: 'Landscape', zh: '风光' },
+  city: { en: 'City', zh: '城市' },
+  nature: { en: 'Nature', zh: '自然' },
+  people: { en: 'People', zh: '人文' },
+  photo: { en: 'Photographs', zh: '照片' },
+};
+
+/** A photo category's display name; unknown ones show as written. */
+export const categoryName = (id: string, lang: Lang) =>
+  CATEGORIES[id]?.[lang] ?? id.charAt(0).toUpperCase() + id.slice(1);
 
 export function formatDate(iso: string, lang: Lang) {
   const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
